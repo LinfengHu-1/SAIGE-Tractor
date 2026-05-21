@@ -12,7 +12,8 @@ Install htslib development headers, then run:
 make -C tools/tractor_hybrid
 ```
 
-The Docker build installs these tools into `/usr/local/bin`.
+The Docker build installs these tools into `/scripts/bin`, matching the
+`kyuan1024/saigetractor:1.4.9-tractor-hybrid.2` runtime layout.
 
 ## Tools
 

@@ -34,9 +34,14 @@ RUN curl -L https://github.com/chrchang/plink-ng/archive/refs/tags/v2.0.0-a.6.16
 
 RUN pixi run R CMD INSTALL .
 
-RUN make -C tools/tractor_hybrid CXX=g++ CXXFLAGS="-O3 -std=c++17 -Wall -Wextra -Wpedantic" BIN_DIR=/usr/local/bin && \
-   flare_subset_to_tractor_hybrid 2>&1 | grep -q "Usage" && \
-   estimate_mac_threshold 2>&1 | grep -q "Usage"
+RUN mkdir -p /scripts && \
+   cp tools/tractor_hybrid/Makefile /scripts/Makefile && \
+   cp -R tools/tractor_hybrid/src /scripts/src && \
+   make -C /scripts CXX=g++ CXXFLAGS="-O3 -std=c++17 -Wall -Wextra -Wpedantic" BIN_DIR=/scripts/bin && \
+   /scripts/bin/flare_subset_to_tractor_hybrid 2>&1 | grep -q "Usage" && \
+   /scripts/bin/estimate_mac_threshold 2>&1 | grep -q "Usage"
+
+ENV PATH=/scripts/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN mv extdata/step1_fitNULLGLMM.R extdata/step2_SPAtests.R extdata/step3_LDmat.R extdata/createSparseGRM.R /usr/local/bin/ && \
    chmod a+x /usr/local/bin/step1_fitNULLGLMM.R /usr/local/bin/step2_SPAtests.R /usr/local/bin/step3_LDmat.R /usr/local/bin/createSparseGRM.R && \

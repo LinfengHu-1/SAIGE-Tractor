@@ -20,6 +20,178 @@
 #include <boost/math/distributions/normal.hpp>
 #include <boost/math/distributions/chi_squared.hpp>
 
+static double g_TRACTORHYBRID_saige_score_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_score_fast_calls = 0.0;
+static double g_TRACTORHYBRID_saige_score_slow_calls = 0.0;
+static double g_TRACTORHYBRID_saige_scorefast_extract_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_scorefast_projection_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_scorefast_variance_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_scorefast_result_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_scorefast_gtilde_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_scorefast_gtilde_calls = 0.0;
+static arma::vec* g_TRACTORHYBRID_saige_scorefast_gtilde_target = nullptr;
+static bool g_TRACTORHYBRID_saige_scorefast_gtilde_ready = false;
+static double g_TRACTORHYBRID_saige_alloc_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_calls = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_accum_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_projection_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_spa_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_spa_calls = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_firth_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_firth_calls = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_condition_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_condition_calls = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_region_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_region_calls = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_other_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_getadjg_other_calls = 0.0;
+static double g_TRACTORHYBRID_saige_spa_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_spa_calls = 0.0;
+static double g_TRACTORHYBRID_saige_firth_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_firth_calls = 0.0;
+static double g_TRACTORHYBRID_saige_er_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_condition_seconds = 0.0;
+static double g_TRACTORHYBRID_saige_region_seconds = 0.0;
+
+static inline double tractor_hybrid_saige_now_seconds(){
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+#define TRACTORHYBRID_SAIGE_TIMED_SCORE(...) do { \
+  double __tractor_saige_start = tractor_hybrid_saige_now_seconds(); \
+  scoreTest(__VA_ARGS__); \
+  g_TRACTORHYBRID_saige_score_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_start; \
+  g_TRACTORHYBRID_saige_score_slow_calls += 1.0; \
+} while(0)
+
+#define TRACTORHYBRID_SAIGE_TIMED_SCORE_FAST(...) do { \
+  double __tractor_saige_start = tractor_hybrid_saige_now_seconds(); \
+  scoreTestFast(__VA_ARGS__); \
+  g_TRACTORHYBRID_saige_score_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_start; \
+  g_TRACTORHYBRID_saige_score_fast_calls += 1.0; \
+} while(0)
+
+#define TRACTORHYBRID_SAIGE_TIMED_GETADJG_REASON(REASON_SECONDS, REASON_CALLS, ...) do { \
+  double __tractor_saige_start = tractor_hybrid_saige_now_seconds(); \
+  getadjGFast(__VA_ARGS__); \
+  double __tractor_saige_delta = tractor_hybrid_saige_now_seconds() - __tractor_saige_start; \
+  g_TRACTORHYBRID_saige_getadjg_seconds += __tractor_saige_delta; \
+  g_TRACTORHYBRID_saige_getadjg_calls += 1.0; \
+  REASON_SECONDS += __tractor_saige_delta; \
+  REASON_CALLS += 1.0; \
+} while(0)
+
+#define TRACTORHYBRID_SAIGE_TIMED_GETADJG(...) \
+  TRACTORHYBRID_SAIGE_TIMED_GETADJG_REASON(g_TRACTORHYBRID_saige_getadjg_other_seconds, g_TRACTORHYBRID_saige_getadjg_other_calls, __VA_ARGS__)
+
+#define TRACTORHYBRID_SAIGE_TIMED_SPA_FAST(...) do { \
+  double __tractor_saige_start = tractor_hybrid_saige_now_seconds(); \
+  SPA_fast(__VA_ARGS__); \
+  g_TRACTORHYBRID_saige_spa_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_start; \
+  g_TRACTORHYBRID_saige_spa_calls += 1.0; \
+} while(0)
+
+#define TRACTORHYBRID_SAIGE_TIMED_SPA(...) do { \
+  double __tractor_saige_start = tractor_hybrid_saige_now_seconds(); \
+  SPA(__VA_ARGS__); \
+  g_TRACTORHYBRID_saige_spa_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_start; \
+  g_TRACTORHYBRID_saige_spa_calls += 1.0; \
+} while(0)
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_score_seconds(){ return g_TRACTORHYBRID_saige_score_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_score_fast_calls(){ return g_TRACTORHYBRID_saige_score_fast_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_score_slow_calls(){ return g_TRACTORHYBRID_saige_score_slow_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_scorefast_extract_seconds(){ return g_TRACTORHYBRID_saige_scorefast_extract_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_scorefast_projection_seconds(){ return g_TRACTORHYBRID_saige_scorefast_projection_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_scorefast_variance_seconds(){ return g_TRACTORHYBRID_saige_scorefast_variance_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_scorefast_result_seconds(){ return g_TRACTORHYBRID_saige_scorefast_result_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_scorefast_gtilde_seconds(){ return g_TRACTORHYBRID_saige_scorefast_gtilde_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_scorefast_gtilde_calls(){ return g_TRACTORHYBRID_saige_scorefast_gtilde_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_alloc_seconds(){ return g_TRACTORHYBRID_saige_alloc_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_seconds(){ return g_TRACTORHYBRID_saige_getadjg_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_calls(){ return g_TRACTORHYBRID_saige_getadjg_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_accum_seconds(){ return g_TRACTORHYBRID_saige_getadjg_accum_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_projection_seconds(){ return g_TRACTORHYBRID_saige_getadjg_projection_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_spa_seconds(){ return g_TRACTORHYBRID_saige_getadjg_spa_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_spa_calls(){ return g_TRACTORHYBRID_saige_getadjg_spa_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_firth_seconds(){ return g_TRACTORHYBRID_saige_getadjg_firth_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_firth_calls(){ return g_TRACTORHYBRID_saige_getadjg_firth_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_condition_seconds(){ return g_TRACTORHYBRID_saige_getadjg_condition_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_condition_calls(){ return g_TRACTORHYBRID_saige_getadjg_condition_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_region_seconds(){ return g_TRACTORHYBRID_saige_getadjg_region_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_region_calls(){ return g_TRACTORHYBRID_saige_getadjg_region_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_other_seconds(){ return g_TRACTORHYBRID_saige_getadjg_other_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_getadjg_other_calls(){ return g_TRACTORHYBRID_saige_getadjg_other_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_spa_seconds(){ return g_TRACTORHYBRID_saige_spa_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_spa_calls(){ return g_TRACTORHYBRID_saige_spa_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_firth_seconds(){ return g_TRACTORHYBRID_saige_firth_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_firth_calls(){ return g_TRACTORHYBRID_saige_firth_calls; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_er_seconds(){ return g_TRACTORHYBRID_saige_er_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_condition_seconds(){ return g_TRACTORHYBRID_saige_condition_seconds; }
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_saige_region_seconds(){ return g_TRACTORHYBRID_saige_region_seconds; }
+
 namespace SAIGE {
 
 SAIGEClass::SAIGEClass(
@@ -143,7 +315,7 @@ void SAIGEClass::scoreTest(arma::vec & t_GVec,
 		     arma::uvec & t_indexForNonZero){
     arma::vec Sm, var2m;
     double S, var2;
-    getadjGFast(t_GVec, t_gtilde, t_indexForNonZero);
+    TRACTORHYBRID_SAIGE_TIMED_GETADJG(t_GVec, t_gtilde, t_indexForNonZero);
     //getadjG(t_GVec, t_gtilde);
 
 
@@ -220,44 +392,146 @@ void SAIGEClass::scoreTestFast(arma::vec & t_GVec,
                      double &t_Tstat,
                      double &t_var1,
                      double &t_var2){
-    //std::cout << "scoreTestFast " << std::endl;
-    arma::vec g1 = t_GVec.elem(t_indexForNonZero);
-    arma::mat X1 = m_X.rows(t_indexForNonZero);
-    arma::mat A1 = m_XVX_inv_XV.rows(t_indexForNonZero);
-    arma::vec mu21;
-    arma::vec res1 = m_res.elem(t_indexForNonZero);
-    arma::vec Z = A1.t() * g1;
-    arma::vec B = X1 * Z;
-    arma::vec g1_tilde = g1 - B;
-    double var1, var2, S, S1, S2, g1tildemu2;
-    arma::vec S_a2;
-    //std::cout << "scoreTestFast1 " << std::endl;
-    double Bmu2;
-    arma::mat  ZtXVXZ = Z.t() * m_XVX * Z;
-    if(m_traitType == "binary" || m_traitType == "survival"){
-      mu21  = m_mu2.elem(t_indexForNonZero);
-      g1tildemu2 = dot(square(g1_tilde), mu21);
-      Bmu2 = arma::dot(square(B),  mu21);
-      var2 = ZtXVXZ(0,0) - Bmu2 + g1tildemu2;
-    }else if(m_traitType == "quantitative"){
-      Bmu2 = dot(g1, B);
-      var2 = ZtXVXZ(0,0)*m_tauvec[0] +  dot(g1,g1) - 2*Bmu2;
+    // TRACTORHYBRID optimized sparse score path: same algebra as the original
+    // scoreTestFast, but avoids large row-subset temporaries and scans
+    // Armadillo's column-major matrices by column.
+    const arma::uword p = m_X.n_cols;
+
+    double __tractor_saige_scorefast_extract_start = tractor_hybrid_saige_now_seconds();
+    arma::vec Z(p, arma::fill::zeros);
+    for(arma::uword k = 0; k < p; ++k){
+      const double* avec = m_XVX_inv_XV.colptr(k);
+      double z = 0.0;
+      for(arma::uword ii = 0; ii < t_indexForNonZero.n_elem; ++ii){
+        const arma::uword row = t_indexForNonZero(ii);
+        z += avec[row] * t_GVec(row);
+      }
+      Z(k) = z;
+    }
+    g_TRACTORHYBRID_saige_scorefast_extract_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_scorefast_extract_start;
+
+    double __tractor_saige_scorefast_gtilde_start = tractor_hybrid_saige_now_seconds();
+    arma::vec* __tractor_scorefast_gtilde = g_TRACTORHYBRID_saige_scorefast_gtilde_target;
+    double* __tractor_scorefast_gtilde_ptr = nullptr;
+    if(__tractor_scorefast_gtilde != nullptr){
+      __tractor_scorefast_gtilde->set_size(t_GVec.n_elem);
+      __tractor_scorefast_gtilde->zeros();
+      __tractor_scorefast_gtilde_ptr = __tractor_scorefast_gtilde->memptr();
+      const arma::uword n = t_GVec.n_elem;
+      for(arma::uword k = 0; k < p; ++k){
+        const double zk = Z(k);
+        if(zk == 0.0){
+          continue;
+        }
+        const double* xvec = m_X.colptr(k);
+        for(arma::uword row = 0; row < n; ++row){
+          __tractor_scorefast_gtilde_ptr[row] -= xvec[row] * zk;
+        }
+      }
+      for(arma::uword ii = 0; ii < t_indexForNonZero.n_elem; ++ii){
+        const arma::uword row = t_indexForNonZero(ii);
+        __tractor_scorefast_gtilde_ptr[row] += t_GVec(row);
+      }
+      g_TRACTORHYBRID_saige_scorefast_gtilde_ready = true;
+      g_TRACTORHYBRID_saige_scorefast_gtilde_calls += 1.0;
+      g_TRACTORHYBRID_saige_scorefast_gtilde_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_scorefast_gtilde_start;
     }
 
-    var1 = var2 * m_varRatioVal;
-    S1 = dot(res1, g1_tilde);
-    arma::mat res1X1_temp = (res1.t()) * X1;
-    arma::vec res1X1 = res1X1_temp.t();
-    S_a2 = m_S_a - res1X1;
-    S2 = - arma::dot(S_a2,  Z);
-    S = S1 + S2;
-    S = S/m_tauvec[0];
+    double __tractor_saige_scorefast_projection_start = tractor_hybrid_saige_now_seconds();
+    arma::vec res1X1(p, arma::fill::zeros);
+    double S1 = 0.0;
+    double Bmu2 = 0.0;
+    double g1tildemu2 = 0.0;
+    double g1g1 = 0.0;
+
+    if(__tractor_scorefast_gtilde_ptr != nullptr){
+      for(arma::uword k = 0; k < p; ++k){
+        const double* xvec = m_X.colptr(k);
+        double rx = 0.0;
+        for(arma::uword ii = 0; ii < t_indexForNonZero.n_elem; ++ii){
+          const arma::uword row = t_indexForNonZero(ii);
+          rx += m_res(row) * xvec[row];
+        }
+        res1X1(k) = rx;
+      }
+
+      for(arma::uword ii = 0; ii < t_indexForNonZero.n_elem; ++ii){
+        const arma::uword row = t_indexForNonZero(ii);
+        const double gv = t_GVec(row);
+        const double res = m_res(row);
+        const double g1_tilde = __tractor_scorefast_gtilde_ptr[row];
+        const double B = gv - g1_tilde;
+
+        S1 += res * g1_tilde;
+
+        if(m_traitType == "binary" || m_traitType == "survival"){
+          const double mu2 = m_mu2(row);
+          g1tildemu2 += g1_tilde * g1_tilde * mu2;
+          Bmu2 += B * B * mu2;
+        }else if(m_traitType == "quantitative"){
+          Bmu2 += gv * B;
+          g1g1 += gv * gv;
+        }
+      }
+    }else{
+      arma::vec Bvec(t_indexForNonZero.n_elem, arma::fill::zeros);
+      for(arma::uword k = 0; k < p; ++k){
+        const double* xvec = m_X.colptr(k);
+        const double zk = Z(k);
+        double rx = 0.0;
+        for(arma::uword ii = 0; ii < t_indexForNonZero.n_elem; ++ii){
+          const arma::uword row = t_indexForNonZero(ii);
+          const double x = xvec[row];
+          Bvec(ii) += x * zk;
+          rx += m_res(row) * x;
+        }
+        res1X1(k) = rx;
+      }
+
+      for(arma::uword ii = 0; ii < t_indexForNonZero.n_elem; ++ii){
+        const arma::uword row = t_indexForNonZero(ii);
+        const double gv = t_GVec(row);
+        const double res = m_res(row);
+        const double B = Bvec(ii);
+
+        const double g1_tilde = gv - B;
+        S1 += res * g1_tilde;
+
+        if(m_traitType == "binary" || m_traitType == "survival"){
+          const double mu2 = m_mu2(row);
+          g1tildemu2 += g1_tilde * g1_tilde * mu2;
+          Bmu2 += B * B * mu2;
+        }else if(m_traitType == "quantitative"){
+          Bmu2 += gv * B;
+          g1g1 += gv * gv;
+        }
+      }
+    }
+    g_TRACTORHYBRID_saige_scorefast_projection_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_scorefast_projection_start;
+
+    double __tractor_saige_scorefast_variance_start = tractor_hybrid_saige_now_seconds();
+    const double ZtXVXZ = arma::as_scalar(Z.t() * m_XVX * Z);
+    double var2 = 0.0;
+    if(m_traitType == "binary" || m_traitType == "survival"){
+      var2 = ZtXVXZ - Bmu2 + g1tildemu2;
+    }else if(m_traitType == "quantitative"){
+      var2 = ZtXVXZ * m_tauvec[0] + g1g1 - 2 * Bmu2;
+    }
+    g_TRACTORHYBRID_saige_scorefast_variance_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_scorefast_variance_start;
+
+    double __tractor_saige_scorefast_result_start = tractor_hybrid_saige_now_seconds();
+    const double var1 = var2 * m_varRatioVal;
+    double S2 = 0.0;
+    for(arma::uword k = 0; k < p; ++k){
+      S2 -= (m_S_a(k) - res1X1(k)) * Z(k);
+    }
+    const double S = (S1 + S2) / m_tauvec[0];
 
     double stat = S*S/var1;
     if (var1 <= std::numeric_limits<double>::min()){
           t_pval = 1;
     }else{
-      if(!std::isnan(stat) && std::isfinite(stat)){	    
+      if(!std::isnan(stat) && std::isfinite(stat)){
           boost::math::chi_squared chisq_dist(1);
           t_pval = boost::math::cdf(complement(chisq_dist, stat));
 
@@ -286,11 +560,13 @@ void SAIGEClass::scoreTestFast(arma::vec & t_GVec,
     std::string buffAsStdStr = pValueBuf;
     t_pval_str = buffAsStdStr;
     t_Beta = S/var1;
-    t_seBeta = fabs(t_Beta) / sqrt(fabs(stat));	
+    t_seBeta = fabs(t_Beta) / sqrt(fabs(stat));
     t_Tstat = S;
     t_var1 = var1;
     t_var2 = var2;
+    g_TRACTORHYBRID_saige_scorefast_result_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_scorefast_result_start;
 }
+
 
 
 void SAIGEClass::getadjG(arma::vec & t_GVec, arma::vec & g){
@@ -308,12 +584,34 @@ void SAIGEClass::getadjGFast(arma::vec & t_GVec, arma::vec & g, arma::uvec & iIn
 {
 
   // To increase computational efficiency when lots of GVec elements are 0
- arma::vec m_XVG(m_p, arma::fill::zeros);
-  for(int i = 0; i < iIndex.n_elem; i++){
-      m_XVG += m_XV.col(iIndex(i)) * t_GVec(iIndex(i));
+  double __tractor_saige_getadjg_accum_start = tractor_hybrid_saige_now_seconds();
+  arma::vec m_XVG(m_p, arma::fill::zeros);
+  for(arma::uword i = 0; i < iIndex.n_elem; ++i){
+      const arma::uword col = iIndex(i);
+      const double gv = t_GVec(col);
+      for(arma::uword k = 0; k < m_XVG.n_elem; ++k){
+          m_XVG(k) += m_XV(k, col) * gv;
+      }
   }
-  g = t_GVec - m_XXVX_inv * m_XVG; 
+  g_TRACTORHYBRID_saige_getadjg_accum_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_getadjg_accum_start;
+
+  double __tractor_saige_getadjg_projection_start = tractor_hybrid_saige_now_seconds();
+  g = t_GVec;
+  double* gptr = g.memptr();
+  const arma::uword n = g.n_elem;
+  for(arma::uword k = 0; k < m_XVG.n_elem; ++k){
+      const double coef = m_XVG(k);
+      if(coef == 0.0){
+          continue;
+      }
+      const double* xptr = m_XXVX_inv.colptr(k);
+      for(arma::uword row = 0; row < n; ++row){
+          gptr[row] -= xptr[row] * coef;
+      }
+  }
+  g_TRACTORHYBRID_saige_getadjg_projection_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_getadjg_projection_start;
 }
+
 
 
 void SAIGEClass::get_mu(arma::vec & t_mu){
@@ -413,11 +711,17 @@ void SAIGEClass::getMarkerPval(arma::vec & t_GVec,
   //std::cout << "isScoreFast " << isScoreFast << std::endl;
 if(!isScoreFast){
   	is_gtilde = true;
-  	scoreTest(t_GVec, t_Beta, t_seBeta, t_pval_noSPA, pval_noadj, ispvallog, t_altFreq, t_Tstat, t_var1, t_var2, t_gtilde, t_P2Vec, t_gy, is_region, iIndex);
+	TRACTORHYBRID_SAIGE_TIMED_SCORE(t_GVec, t_Beta, t_seBeta, t_pval_noSPA, pval_noadj, ispvallog, t_altFreq, t_Tstat, t_var1, t_var2, t_gtilde, t_P2Vec, t_gy, is_region, iIndex);
   }else{
   	is_gtilde = false;
         //std::cout << "getMarkerPval 3" << std::endl;
-        scoreTestFast(t_GVec, iIndex, t_Beta, t_seBeta, t_pval_noSPA, pval_noadj, ispvallog, t_altFreq, t_Tstat, t_var1, t_var2);
+        g_TRACTORHYBRID_saige_scorefast_gtilde_target = is_region ? &t_gtilde : nullptr;
+        g_TRACTORHYBRID_saige_scorefast_gtilde_ready = false;
+        TRACTORHYBRID_SAIGE_TIMED_SCORE_FAST(t_GVec, iIndex, t_Beta, t_seBeta, t_pval_noSPA, pval_noadj, ispvallog, t_altFreq, t_Tstat, t_var1, t_var2);
+        if(g_TRACTORHYBRID_saige_scorefast_gtilde_ready){
+          is_gtilde = true;
+        }
+        g_TRACTORHYBRID_saige_scorefast_gtilde_target = nullptr;
   }
 
 //std::cout << "scoreTest 0 " << std::endl;
@@ -435,10 +739,12 @@ if(!isScoreFast){
   
   unsigned int iIndexComVecSize = iIndexComVec.n_elem;
   unsigned int iIndexSize = iIndex.n_elem; 
+  double __tractor_saige_alloc_start = tractor_hybrid_saige_now_seconds();
   arma::vec gNB(iIndexSize, arma::fill::none);
   arma::vec gNA(iIndexComVecSize, arma::fill::none);
   arma::vec muNB(iIndexSize, arma::fill::none);
   arma::vec muNA(iIndexComVecSize, arma::fill::none);
+  g_TRACTORHYBRID_saige_alloc_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_alloc_start;
 
 
   double gmuNB;
@@ -462,7 +768,7 @@ if(!t_isER){
        if(!is_gtilde){
           t_gtilde.resize(m_n);
 	  //std::cout << "scoreTest 3a " << std::endl;
-          getadjGFast(t_GVec, t_gtilde, iIndex);
+          TRACTORHYBRID_SAIGE_TIMED_GETADJG_REASON(g_TRACTORHYBRID_saige_getadjg_spa_seconds, g_TRACTORHYBRID_saige_getadjg_spa_calls, t_GVec, t_gtilde, iIndex);
 	  //std::cout << "scoreTest 3b " << std::endl;
 	  is_gtilde = true;
        }
@@ -555,12 +861,12 @@ if(!t_isER){
 	if(p_iIndexComVecSize >= 0.5 && !m_flagSparseGRM_cur){
 		//std::cout << "SPA fast 1" << std::endl;
 		//std::cout << "SPA_fast" << std::endl;
-        	SPA_fast(m_mu, t_gtilde, q, qinv, pval_noadj, ispvallog, gNA, gNB, muNA, muNB, NAmu, NAsigma, tol1, m_traitType, t_SPApval, t_isSPAConverge);
+		TRACTORHYBRID_SAIGE_TIMED_SPA_FAST(m_mu, t_gtilde, q, qinv, pval_noadj, ispvallog, gNA, gNB, muNA, muNB, NAmu, NAsigma, tol1, m_traitType, t_SPApval, t_isSPAConverge);
 	
 	}else{
 		//std::cout << "SPA 1" << std::endl;
 		//std::cout << "SPA" << std::endl;
-		SPA(m_mu, t_gtilde, q, qinv, pval_noadj, tol1, ispvallog, m_traitType, t_SPApval, t_isSPAConverge);	
+			TRACTORHYBRID_SAIGE_TIMED_SPA(m_mu, t_gtilde, q, qinv, pval_noadj, tol1, ispvallog, m_traitType, t_SPApval, t_isSPAConverge);
 	}
 
 	//std::cout << "SPA" << std::endl;
@@ -635,6 +941,7 @@ if(!t_isER){
    }
 
 }else{ //if(!t_isER){
+double __tractor_saige_er_start = tractor_hybrid_saige_now_seconds();
 double t_GVecMAC = arma::accu(t_GVec); 
     arma::mat Z_er(t_GVec.n_elem, 1);
     Z_er.col(0) = t_GVec;
@@ -664,11 +971,14 @@ double t_GVecMAC = arma::accu(t_GVec);
 	t_isFirth = true;
 	t_qval_Firth = t_qval_ER;
     }	    
+  g_TRACTORHYBRID_saige_er_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_er_start;
 }
 
    if(t_isFirth){
+   double __tractor_saige_firth_start = tractor_hybrid_saige_now_seconds();
+   g_TRACTORHYBRID_saige_firth_calls += 1.0;
 	if(!is_gtilde){
-                getadjGFast(t_GVec, t_gtilde, iIndex);
+                TRACTORHYBRID_SAIGE_TIMED_GETADJG_REASON(g_TRACTORHYBRID_saige_getadjg_firth_seconds, g_TRACTORHYBRID_saige_getadjg_firth_calls, t_GVec, t_gtilde, iIndex);
                 is_gtilde = true;
         }
 	arma::mat x(t_GVec.n_elem, 2, arma::fill::ones);	
@@ -677,6 +987,7 @@ double t_GVecMAC = arma::accu(t_GVec);
 	fast_logistf_fit_simple(x, m_y, m_offset, true, init, 50, 15, 15, 1e-5, 1e-5, 1e-5, t_Beta ,t_seBeta, t_isFirthConverge);
 	//back calculates se based on beta from firth adjustion and the p-value that accounts for case-control imbalance
 	t_seBeta = fabs(t_Beta)/fabs(t_qval_Firth);
+   g_TRACTORHYBRID_saige_firth_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_firth_start;
    }
    
  //arma::vec timeoutput4 = getTime();
@@ -688,8 +999,9 @@ double t_GVecMAC = arma::accu(t_GVec);
 
    //condition
    if(t_isCondition){
+   double __tractor_saige_condition_start = tractor_hybrid_saige_now_seconds();
 	if(!is_gtilde){
-        	getadjGFast(t_GVec, t_gtilde, iIndex);
+		TRACTORHYBRID_SAIGE_TIMED_GETADJG_REASON(g_TRACTORHYBRID_saige_getadjg_condition_seconds, g_TRACTORHYBRID_saige_getadjg_condition_calls, t_GVec, t_gtilde, iIndex);
         	is_gtilde = true;
         }
         t_G1tilde_P_G2tilde = sqrt(m_varRatioVal) * t_gtilde.t() * m_P2Mat_cond;
@@ -853,6 +1165,7 @@ double t_GVecMAC = arma::accu(t_GVec);
     	t_pval_c = t_pval_noSPA_c;	    
     }	    
 */
+   g_TRACTORHYBRID_saige_condition_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_condition_start;
  }
 
     gNA.clear();
@@ -863,7 +1176,7 @@ double t_GVecMAC = arma::accu(t_GVec);
 
 
     if(is_region && !is_gtilde){
-	getadjGFast(t_GVec, t_gtilde, iIndex);
+	TRACTORHYBRID_SAIGE_TIMED_GETADJG_REASON(g_TRACTORHYBRID_saige_getadjg_region_seconds, g_TRACTORHYBRID_saige_getadjg_region_calls, t_GVec, t_gtilde, iIndex);
 	is_gtilde = true; 
     }
 
@@ -872,6 +1185,7 @@ double t_GVecMAC = arma::accu(t_GVec);
     //std::cout << "isScoreFast " << isScoreFast << std::endl;
     //std::cout << "m_flagSparseGRM_cur " << m_flagSparseGRM_cur << std::endl;
     if(is_region && isScoreFast){
+      double __tractor_saige_region_start = tractor_hybrid_saige_now_seconds();
 
       t_gy = dot(t_gtilde, m_y);
       if(!m_flagSparseGRM_cur){
@@ -881,6 +1195,7 @@ double t_GVecMAC = arma::accu(t_GVec);
         arma::sp_mat m_SigmaMat_sp = gen_sp_SigmaMat();
         t_P2Vec = arma::spsolve(m_SigmaMat_sp, t_gtilde);
       }
+      g_TRACTORHYBRID_saige_region_seconds += tractor_hybrid_saige_now_seconds() - __tractor_saige_region_start;
     }
 }
 
@@ -1235,7 +1550,7 @@ void SAIGEClass::extract_anc_stat_for_cond(
         arma::vec & t_Tstat_cond,
         arma::uvec & t_indexForNonZero
 ){
-    getadjGFast(t_GVec, t_gtilde, t_indexForNonZero);
+    TRACTORHYBRID_SAIGE_TIMED_GETADJG_REASON(g_TRACTORHYBRID_saige_getadjg_condition_seconds, g_TRACTORHYBRID_saige_getadjg_condition_calls, t_GVec, t_gtilde, t_indexForNonZero);
     //getadjG(t_GVec, t_gtilde);
 
     double S = dot(t_gtilde, m_res);

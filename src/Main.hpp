@@ -191,6 +191,8 @@ void set_iterator_inVcf(std::string & variantList, std::string & chrom, int & be
 
 bool check_Vcf_end();
 
+bool check_TRACTORHYBRID_end();
+
 arma::vec fast_logistf_fit(arma::mat & x,
                 arma::vec & y,
                 arma::vec & weight,

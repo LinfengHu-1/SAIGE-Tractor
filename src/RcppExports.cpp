@@ -286,6 +286,17 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// setTRACTORHYBRIDobjInCPP
+void setTRACTORHYBRIDobjInCPP(std::string t_prefix, std::vector<std::string>& t_SampleInModel);
+RcppExport SEXP _SAIGE_setTRACTORHYBRIDobjInCPP(SEXP t_prefixSEXP, SEXP t_SampleInModelSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type t_prefix(t_prefixSEXP);
+    Rcpp::traits::input_parameter< std::vector<std::string>& >::type t_SampleInModel(t_SampleInModelSEXP);
+    setTRACTORHYBRIDobjInCPP(t_prefix, t_SampleInModel);
+    return R_NilValue;
+END_RCPP
+}
 // setSAIGEobjInCPP
 void setSAIGEobjInCPP(arma::mat& t_XVX, arma::mat& t_XXVX_inv, arma::mat& t_XV, arma::mat& t_XVX_inv_XV, arma::mat& t_Sigma_iXXSigma_iX, arma::mat& t_X, arma::vec& t_S_a, arma::vec& t_res, arma::vec& t_mu2, arma::vec& t_mu, arma::vec& t_varRatio_sparse, arma::vec& t_varRatio_null, arma::vec& t_cateVarRatioMinMACVecExclude, arma::vec& t_cateVarRatioMaxMACVecInclude, double t_SPA_Cutoff, arma::vec& t_tauvec, std::string t_traitType, arma::vec& t_y, std::string t_impute_method, bool t_flagSparseGRM, bool t_isFastTest, double t_pval_cutoff_for_fastTest, arma::umat& t_locationMat, arma::vec& t_valueVec, int t_dimNum, bool t_isCondition, std::vector<uint32_t>& t_condition_genoIndex, bool t_is_Firth_beta, double t_pCutoffforFirth, arma::vec& t_offset, arma::vec& t_resout);
 RcppExport SEXP _SAIGE_setSAIGEobjInCPP(SEXP t_XVXSEXP, SEXP t_XXVX_invSEXP, SEXP t_XVSEXP, SEXP t_XVX_inv_XVSEXP, SEXP t_Sigma_iXXSigma_iXSEXP, SEXP t_XSEXP, SEXP t_S_aSEXP, SEXP t_resSEXP, SEXP t_mu2SEXP, SEXP t_muSEXP, SEXP t_varRatio_sparseSEXP, SEXP t_varRatio_nullSEXP, SEXP t_cateVarRatioMinMACVecExcludeSEXP, SEXP t_cateVarRatioMaxMACVecIncludeSEXP, SEXP t_SPA_CutoffSEXP, SEXP t_tauvecSEXP, SEXP t_traitTypeSEXP, SEXP t_ySEXP, SEXP t_impute_methodSEXP, SEXP t_flagSparseGRMSEXP, SEXP t_isFastTestSEXP, SEXP t_pval_cutoff_for_fastTestSEXP, SEXP t_locationMatSEXP, SEXP t_valueVecSEXP, SEXP t_dimNumSEXP, SEXP t_isConditionSEXP, SEXP t_condition_genoIndexSEXP, SEXP t_is_Firth_betaSEXP, SEXP t_pCutoffforFirthSEXP, SEXP t_offsetSEXP, SEXP t_resoutSEXP) {
@@ -434,6 +445,158 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type i(iSEXP);
     move_forward_iterator_Vcf(i);
     return R_NilValue;
+END_RCPP
+}
+// set_iterator_inTRACTORHYBRID
+void set_iterator_inTRACTORHYBRID(std::string chrom, int beg_pd, int end_pd);
+RcppExport SEXP _SAIGE_set_iterator_inTRACTORHYBRID(SEXP chromSEXP, SEXP beg_pdSEXP, SEXP end_pdSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type chrom(chromSEXP);
+    Rcpp::traits::input_parameter< int >::type beg_pd(beg_pdSEXP);
+    Rcpp::traits::input_parameter< int >::type end_pd(end_pdSEXP);
+    set_iterator_inTRACTORHYBRID(chrom, beg_pd, end_pd);
+    return R_NilValue;
+END_RCPP
+}
+// check_TRACTORHYBRID_end
+bool check_TRACTORHYBRID_end();
+RcppExport SEXP _SAIGE_check_TRACTORHYBRID_end() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(check_TRACTORHYBRID_end());
+    return rcpp_result_gen;
+END_RCPP
+}
+// move_forward_iterator_TRACTORHYBRID
+void move_forward_iterator_TRACTORHYBRID(int i);
+RcppExport SEXP _SAIGE_move_forward_iterator_TRACTORHYBRID(SEXP iSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type i(iSEXP);
+    move_forward_iterator_TRACTORHYBRID(i);
+    return R_NilValue;
+END_RCPP
+}
+// get_TRACTORHYBRID_io_seconds
+double get_TRACTORHYBRID_io_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_io_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_io_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_decode_seconds
+double get_TRACTORHYBRID_decode_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_decode_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_decode_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_get_marker_seconds
+double get_TRACTORHYBRID_get_marker_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_get_marker_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_get_marker_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_pvalue_seconds
+double get_TRACTORHYBRID_pvalue_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_pvalue_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_pvalue_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_output_seconds
+double get_TRACTORHYBRID_output_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_output_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_output_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_reset_seconds
+double get_TRACTORHYBRID_reset_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_reset_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_reset_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_condition_seconds
+double get_TRACTORHYBRID_condition_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_condition_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_condition_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_impute_qc_seconds
+double get_TRACTORHYBRID_impute_qc_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_impute_qc_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_impute_qc_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_joint_seconds
+double get_TRACTORHYBRID_joint_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_joint_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_joint_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_variance_seconds
+double get_TRACTORHYBRID_variance_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_variance_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_variance_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_condition_cache_hits
+double get_TRACTORHYBRID_condition_cache_hits();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_condition_cache_hits() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_condition_cache_hits());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_condition_cache_misses
+double get_TRACTORHYBRID_condition_cache_misses();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_condition_cache_misses() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_condition_cache_misses());
+    return rcpp_result_gen;
 END_RCPP
 }
 // fast_logistf_fit
@@ -2618,6 +2781,316 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// get_TRACTORHYBRID_saige_score_seconds
+double get_TRACTORHYBRID_saige_score_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_score_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_score_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_score_fast_calls
+double get_TRACTORHYBRID_saige_score_fast_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_score_fast_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_score_fast_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_score_slow_calls
+double get_TRACTORHYBRID_saige_score_slow_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_score_slow_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_score_slow_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_scorefast_extract_seconds
+double get_TRACTORHYBRID_saige_scorefast_extract_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_scorefast_extract_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_scorefast_extract_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_scorefast_projection_seconds
+double get_TRACTORHYBRID_saige_scorefast_projection_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_scorefast_projection_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_scorefast_projection_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_scorefast_variance_seconds
+double get_TRACTORHYBRID_saige_scorefast_variance_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_scorefast_variance_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_scorefast_variance_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_scorefast_result_seconds
+double get_TRACTORHYBRID_saige_scorefast_result_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_scorefast_result_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_scorefast_result_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_scorefast_gtilde_seconds
+double get_TRACTORHYBRID_saige_scorefast_gtilde_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_scorefast_gtilde_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_scorefast_gtilde_calls
+double get_TRACTORHYBRID_saige_scorefast_gtilde_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_scorefast_gtilde_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_alloc_seconds
+double get_TRACTORHYBRID_saige_alloc_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_alloc_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_alloc_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_seconds
+double get_TRACTORHYBRID_saige_getadjg_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_calls
+double get_TRACTORHYBRID_saige_getadjg_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_accum_seconds
+double get_TRACTORHYBRID_saige_getadjg_accum_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_accum_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_accum_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_projection_seconds
+double get_TRACTORHYBRID_saige_getadjg_projection_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_projection_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_projection_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_spa_seconds
+double get_TRACTORHYBRID_saige_getadjg_spa_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_spa_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_spa_calls
+double get_TRACTORHYBRID_saige_getadjg_spa_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_spa_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_firth_seconds
+double get_TRACTORHYBRID_saige_getadjg_firth_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_firth_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_firth_calls
+double get_TRACTORHYBRID_saige_getadjg_firth_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_firth_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_condition_seconds
+double get_TRACTORHYBRID_saige_getadjg_condition_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_condition_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_condition_calls
+double get_TRACTORHYBRID_saige_getadjg_condition_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_condition_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_region_seconds
+double get_TRACTORHYBRID_saige_getadjg_region_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_region_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_region_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_region_calls
+double get_TRACTORHYBRID_saige_getadjg_region_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_region_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_region_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_other_seconds
+double get_TRACTORHYBRID_saige_getadjg_other_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_other_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_other_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_getadjg_other_calls
+double get_TRACTORHYBRID_saige_getadjg_other_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_getadjg_other_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_getadjg_other_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_spa_seconds
+double get_TRACTORHYBRID_saige_spa_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_spa_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_spa_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_spa_calls
+double get_TRACTORHYBRID_saige_spa_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_spa_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_spa_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_firth_seconds
+double get_TRACTORHYBRID_saige_firth_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_firth_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_firth_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_firth_calls
+double get_TRACTORHYBRID_saige_firth_calls();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_firth_calls() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_firth_calls());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_er_seconds
+double get_TRACTORHYBRID_saige_er_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_er_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_er_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_condition_seconds
+double get_TRACTORHYBRID_saige_condition_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_condition_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_condition_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_TRACTORHYBRID_saige_region_seconds
+double get_TRACTORHYBRID_saige_region_seconds();
+RcppExport SEXP _SAIGE_get_TRACTORHYBRID_saige_region_seconds() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_TRACTORHYBRID_saige_region_seconds());
+    return rcpp_result_gen;
+END_RCPP
+}
 // call_qfc
 Rcpp::List call_qfc(arma::vec& lambdas, arma::vec& noncentral, arma::ivec& df, int r, double sigma, double q, int lim, double acc);
 RcppExport SEXP _SAIGE_call_qfc(SEXP lambdasSEXP, SEXP noncentralSEXP, SEXP dfSEXP, SEXP rSEXP, SEXP sigmaSEXP, SEXP qSEXP, SEXP limSEXP, SEXP accSEXP) {
@@ -3372,6 +3845,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SAIGE_setPLINKobjInCPP", (DL_FUNC) &_SAIGE_setPLINKobjInCPP, 5},
     {"_SAIGE_setBGENobjInCPP", (DL_FUNC) &_SAIGE_setBGENobjInCPP, 5},
     {"_SAIGE_setVCFobjInCPP", (DL_FUNC) &_SAIGE_setVCFobjInCPP, 4},
+    {"_SAIGE_setTRACTORHYBRIDobjInCPP", (DL_FUNC) &_SAIGE_setTRACTORHYBRIDobjInCPP, 2},
     {"_SAIGE_setSAIGEobjInCPP", (DL_FUNC) &_SAIGE_setSAIGEobjInCPP, 31},
     {"_SAIGE_setSparseSigmaInCPP", (DL_FUNC) &_SAIGE_setSparseSigmaInCPP, 3},
     {"_SAIGE_RegionSetUpConditional_binary_InCPP", (DL_FUNC) &_SAIGE_RegionSetUpConditional_binary_InCPP, 1},
@@ -3381,6 +3855,21 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SAIGE_set_iterator_inVcf", (DL_FUNC) &_SAIGE_set_iterator_inVcf, 4},
     {"_SAIGE_check_Vcf_end", (DL_FUNC) &_SAIGE_check_Vcf_end, 0},
     {"_SAIGE_move_forward_iterator_Vcf", (DL_FUNC) &_SAIGE_move_forward_iterator_Vcf, 1},
+    {"_SAIGE_set_iterator_inTRACTORHYBRID", (DL_FUNC) &_SAIGE_set_iterator_inTRACTORHYBRID, 3},
+    {"_SAIGE_check_TRACTORHYBRID_end", (DL_FUNC) &_SAIGE_check_TRACTORHYBRID_end, 0},
+    {"_SAIGE_move_forward_iterator_TRACTORHYBRID", (DL_FUNC) &_SAIGE_move_forward_iterator_TRACTORHYBRID, 1},
+    {"_SAIGE_get_TRACTORHYBRID_io_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_io_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_decode_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_decode_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_get_marker_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_get_marker_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_pvalue_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_pvalue_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_output_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_output_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_reset_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_reset_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_condition_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_condition_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_impute_qc_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_impute_qc_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_joint_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_joint_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_variance_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_variance_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_condition_cache_hits", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_condition_cache_hits, 0},
+    {"_SAIGE_get_TRACTORHYBRID_condition_cache_misses", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_condition_cache_misses, 0},
     {"_SAIGE_fast_logistf_fit", (DL_FUNC) &_SAIGE_fast_logistf_fit, 14},
     {"_SAIGE_closeGenoFile", (DL_FUNC) &_SAIGE_closeGenoFile, 1},
     {"_SAIGE_openOutfile", (DL_FUNC) &_SAIGE_openOutfile, 2},
@@ -3539,6 +4028,37 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SAIGE_setmaxMissingRateforGRM", (DL_FUNC) &_SAIGE_setmaxMissingRateforGRM, 1},
     {"_SAIGE_set_Diagof_StdGeno_LOCO", (DL_FUNC) &_SAIGE_set_Diagof_StdGeno_LOCO, 0},
     {"_SAIGE_setminMAC_VarianceRatio", (DL_FUNC) &_SAIGE_setminMAC_VarianceRatio, 3},
+    {"_SAIGE_get_TRACTORHYBRID_saige_score_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_score_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_score_fast_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_score_fast_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_score_slow_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_score_slow_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_scorefast_extract_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_scorefast_extract_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_scorefast_projection_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_scorefast_projection_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_scorefast_variance_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_scorefast_variance_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_scorefast_result_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_scorefast_result_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_alloc_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_alloc_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_accum_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_accum_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_projection_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_projection_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_region_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_region_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_region_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_region_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_other_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_other_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_getadjg_other_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_getadjg_other_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_spa_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_spa_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_spa_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_spa_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_firth_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_firth_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_firth_calls", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_firth_calls, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_er_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_er_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_condition_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_condition_seconds, 0},
+    {"_SAIGE_get_TRACTORHYBRID_saige_region_seconds", (DL_FUNC) &_SAIGE_get_TRACTORHYBRID_saige_region_seconds, 0},
     {"_SAIGE_call_qfc", (DL_FUNC) &_SAIGE_call_qfc, 8},
     {"_SAIGE_Get_Davies_PVal", (DL_FUNC) &_SAIGE_Get_Davies_PVal, 4},
     {"_SAIGE_SKAT_davies", (DL_FUNC) &_SAIGE_SKAT_davies, 7},

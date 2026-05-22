@@ -12,3 +12,4 @@ extdata/input/nfam_100_nindep_0_step1_includeMoreRareVariants_poly.raw
 *.swp
 plink-ng/
 pixi.lock
+tools/tractor_hybrid/bin/

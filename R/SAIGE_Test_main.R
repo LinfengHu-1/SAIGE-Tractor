@@ -69,6 +69,7 @@ SPAGMMATtest = function(bgenFile = "",
                  bedFile="",
                  bimFile="",
                  famFile="",
+                 tractorHybridPrefix = "",
                  AlleleOrder = "alt-first", #new
                  idstoIncludeFile = "",
                  rangestoIncludeFile = "",
@@ -373,6 +374,7 @@ SPAGMMATtest = function(bgenFile = "",
                  bedFile=bedFile,
                  bimFile=bimFile,
                  famFile=famFile,
+                 tractorHybridPrefix = tractorHybridPrefix,
                  idstoIncludeFile = idstoIncludeFile,
                  rangestoIncludeFile = rangestoIncludeFile,
                  chrom = chrom,
@@ -434,6 +436,9 @@ SPAGMMATtest = function(bgenFile = "",
 #time_8 = proc.time()
 #process condition
     if (isCondition) {
+        if(genoType == "tractor_hybrid"){
+            stop("tractor_hybrid streaming step2 currently does not support conditional analysis by marker ID")
+        }
         n = length(obj.model$y) #sample size
 
 	##re-order the conditioning markers

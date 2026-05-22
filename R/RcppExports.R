@@ -81,6 +81,10 @@ setVCFobjInCPP <- function(t_vcfFileName, t_vcfFileIndex, t_vcfField, t_SampleIn
     invisible(.Call('_SAIGE_setVCFobjInCPP', PACKAGE = 'SAIGE', t_vcfFileName, t_vcfFileIndex, t_vcfField, t_SampleInModel))
 }
 
+setTRACTORHYBRIDobjInCPP <- function(t_prefix, t_SampleInModel) {
+    invisible(.Call('_SAIGE_setTRACTORHYBRIDobjInCPP', PACKAGE = 'SAIGE', t_prefix, t_SampleInModel))
+}
+
 setSAIGEobjInCPP <- function(t_XVX, t_XXVX_inv, t_XV, t_XVX_inv_XV, t_Sigma_iXXSigma_iX, t_X, t_S_a, t_res, t_mu2, t_mu, t_varRatio_sparse, t_varRatio_null, t_cateVarRatioMinMACVecExclude, t_cateVarRatioMaxMACVecInclude, t_SPA_Cutoff, t_tauvec, t_traitType, t_y, t_impute_method, t_flagSparseGRM, t_isFastTest, t_pval_cutoff_for_fastTest, t_locationMat, t_valueVec, t_dimNum, t_isCondition, t_condition_genoIndex, t_is_Firth_beta, t_pCutoffforFirth, t_offset, t_resout) {
     invisible(.Call('_SAIGE_setSAIGEobjInCPP', PACKAGE = 'SAIGE', t_XVX, t_XXVX_inv, t_XV, t_XVX_inv_XV, t_Sigma_iXXSigma_iX, t_X, t_S_a, t_res, t_mu2, t_mu, t_varRatio_sparse, t_varRatio_null, t_cateVarRatioMinMACVecExclude, t_cateVarRatioMaxMACVecInclude, t_SPA_Cutoff, t_tauvec, t_traitType, t_y, t_impute_method, t_flagSparseGRM, t_isFastTest, t_pval_cutoff_for_fastTest, t_locationMat, t_valueVec, t_dimNum, t_isCondition, t_condition_genoIndex, t_is_Firth_beta, t_pCutoffforFirth, t_offset, t_resout))
 }
@@ -115,6 +119,66 @@ check_Vcf_end <- function() {
 
 move_forward_iterator_Vcf <- function(i) {
     invisible(.Call('_SAIGE_move_forward_iterator_Vcf', PACKAGE = 'SAIGE', i))
+}
+
+set_iterator_inTRACTORHYBRID <- function(chrom, beg_pd, end_pd) {
+    invisible(.Call('_SAIGE_set_iterator_inTRACTORHYBRID', PACKAGE = 'SAIGE', chrom, beg_pd, end_pd))
+}
+
+check_TRACTORHYBRID_end <- function() {
+    .Call('_SAIGE_check_TRACTORHYBRID_end', PACKAGE = 'SAIGE')
+}
+
+move_forward_iterator_TRACTORHYBRID <- function(i) {
+    invisible(.Call('_SAIGE_move_forward_iterator_TRACTORHYBRID', PACKAGE = 'SAIGE', i))
+}
+
+get_TRACTORHYBRID_io_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_io_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_decode_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_decode_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_get_marker_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_get_marker_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_pvalue_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_pvalue_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_output_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_output_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_reset_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_reset_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_condition_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_condition_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_impute_qc_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_impute_qc_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_joint_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_joint_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_variance_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_variance_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_condition_cache_hits <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_condition_cache_hits', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_condition_cache_misses <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_condition_cache_misses', PACKAGE = 'SAIGE')
 }
 
 fast_logistf_fit <- function(x, y, weight, offset, firth, col_fit, init, maxit, maxstep, maxhs, lconv, gconv, xconv, isfirthconverge) {
@@ -747,6 +811,130 @@ set_Diagof_StdGeno_LOCO <- function() {
 
 setminMAC_VarianceRatio <- function(t_minMACVarRatio, t_maxMACVarRatio, t_isVarianceRatioinGeno) {
     invisible(.Call('_SAIGE_setminMAC_VarianceRatio', PACKAGE = 'SAIGE', t_minMACVarRatio, t_maxMACVarRatio, t_isVarianceRatioinGeno))
+}
+
+get_TRACTORHYBRID_saige_score_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_score_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_score_fast_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_score_fast_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_score_slow_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_score_slow_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_scorefast_extract_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_scorefast_extract_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_scorefast_projection_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_scorefast_projection_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_scorefast_variance_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_scorefast_variance_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_scorefast_result_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_scorefast_result_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_scorefast_gtilde_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_scorefast_gtilde_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_scorefast_gtilde_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_alloc_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_alloc_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_accum_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_accum_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_projection_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_projection_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_spa_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_spa_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_spa_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_firth_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_firth_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_firth_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_condition_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_condition_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_condition_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_region_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_region_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_region_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_region_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_other_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_other_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_getadjg_other_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_getadjg_other_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_spa_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_spa_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_spa_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_spa_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_firth_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_firth_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_firth_calls <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_firth_calls', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_er_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_er_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_condition_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_condition_seconds', PACKAGE = 'SAIGE')
+}
+
+get_TRACTORHYBRID_saige_region_seconds <- function() {
+    .Call('_SAIGE_get_TRACTORHYBRID_saige_region_seconds', PACKAGE = 'SAIGE')
 }
 
 call_qfc <- function(lambdas, noncentral, df, r, sigma, q, lim, acc) {

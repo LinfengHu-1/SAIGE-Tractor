@@ -20,6 +20,7 @@
 #include "PLINK.hpp"
 #include "BGEN.hpp"
 #include "VCF.hpp"
+#include "TractorHybrid.hpp"
 #include "SAIGE_test.hpp"
 #include "UTIL.hpp"
 #include "CCT.hpp"
@@ -36,6 +37,67 @@
 static PLINK::PlinkClass* ptr_gPLINKobj = NULL;
 static BGEN::BgenClass* ptr_gBGENobj = NULL;
 static VCF::VcfClass* ptr_gVCFobj = NULL;
+static TRACTOR_HYBRID::TractorHybridClass* ptr_gTRACTORHYBRIDobj = NULL;
+static double g_TRACTORHYBRID_get_marker_seconds = 0.0;
+static double g_TRACTORHYBRID_marker_pvalue_seconds = 0.0;
+static double g_TRACTORHYBRID_output_seconds = 0.0;
+static double g_TRACTORHYBRID_reset_seconds = 0.0;
+static double g_TRACTORHYBRID_condition_seconds = 0.0;
+static double g_TRACTORHYBRID_impute_qc_seconds = 0.0;
+static double g_TRACTORHYBRID_joint_seconds = 0.0;
+static double g_TRACTORHYBRID_variance_seconds = 0.0;
+static double g_TRACTORHYBRID_condition_cache_hits = 0.0;
+static double g_TRACTORHYBRID_condition_cache_misses = 0.0;
+static bool g_TRACTORHYBRID_condition_cache_valid = false;
+static uint32_t g_TRACTORHYBRID_condition_cache_block_id = UINT32_MAX;
+static int g_TRACTORHYBRID_condition_cache_n_anc = -1;
+static double g_TRACTORHYBRID_condition_cache_cutoff = 0.0;
+static std::string g_TRACTORHYBRID_condition_cache_trait;
+static arma::vec g_TRACTORHYBRID_condition_cache_nanc_case_vec;
+static arma::vec g_TRACTORHYBRID_condition_cache_nanc_ctrl_vec;
+static arma::vec g_TRACTORHYBRID_condition_cache_nanc_vec;
+static arma::uvec g_TRACTORHYBRID_condition_cache_not_nan_anc_indices_vec;
+static bool g_TRACTORHYBRID_condition_cache_isconditiononHaplo = false;
+static arma::mat g_TRACTORHYBRID_condition_cache_P2Mat_cond;
+static arma::mat g_TRACTORHYBRID_condition_cache_VarInvMat_cond;
+static arma::mat g_TRACTORHYBRID_condition_cache_VarMat_cond;
+static arma::vec g_TRACTORHYBRID_condition_cache_Tstat_cond;
+static arma::vec g_TRACTORHYBRID_condition_cache_G2_Weight_cond;
+static arma::vec g_TRACTORHYBRID_condition_cache_MAF_cond;
+static double g_TRACTORHYBRID_condition_cache_qsum_cond = 0.0;
+static arma::vec g_TRACTORHYBRID_condition_cache_gsum_cond;
+static std::vector<std::string> g_TRACTORHYBRID_condition_cache_p_cond;
+
+static inline void tractor_hybrid_clear_condition_cache(){
+  g_TRACTORHYBRID_condition_cache_valid = false;
+  g_TRACTORHYBRID_condition_cache_block_id = UINT32_MAX;
+  g_TRACTORHYBRID_condition_cache_n_anc = -1;
+  g_TRACTORHYBRID_condition_cache_trait.clear();
+}
+
+static inline double tractor_hybrid_now_seconds(){
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+#define TRACTORHYBRID_TIMED_GET_MARKER_PVAL(...) do {   double __tractor_pvalue_start = tractor_hybrid_now_seconds();   (*ptr_gSAIGEobj).getMarkerPval(__VA_ARGS__);   g_TRACTORHYBRID_marker_pvalue_seconds += tractor_hybrid_now_seconds() - __tractor_pvalue_start; } while(0)
+
+#define TRACTORHYBRID_TIMED_ASSIGN_CONDITION(...) do {   double __tractor_condition_start = tractor_hybrid_now_seconds();   assign_conditionHaplotypes(__VA_ARGS__);   g_TRACTORHYBRID_condition_seconds += tractor_hybrid_now_seconds() - __tractor_condition_start; } while(0)
+
+#define TRACTORHYBRID_TIMED_IMPUTE_FAKEFLIP(...) ([&](){   double __tractor_impute_start = tractor_hybrid_now_seconds();   auto __tractor_impute_ret = (imputeGenoAndFlip_fakeflip)(__VA_ARGS__);   g_TRACTORHYBRID_impute_qc_seconds += tractor_hybrid_now_seconds() - __tractor_impute_start;   return __tractor_impute_ret; }())
+
+#define TRACTORHYBRID_TIMED_IMPUTE(...) ([&](){   double __tractor_impute_start = tractor_hybrid_now_seconds();   auto __tractor_impute_ret = (imputeGenoAndFlip)(__VA_ARGS__);   g_TRACTORHYBRID_impute_qc_seconds += tractor_hybrid_now_seconds() - __tractor_impute_start;   return __tractor_impute_ret; }())
+
+#define TRACTORHYBRID_TIMED_GET_JOINT(...) ([&](){   double __tractor_joint_start = tractor_hybrid_now_seconds();   auto __tractor_joint_ret = (get_jointScore_pvalue)(__VA_ARGS__);   g_TRACTORHYBRID_joint_seconds += tractor_hybrid_now_seconds() - __tractor_joint_start;   return __tractor_joint_ret; }())
+
+#define TRACTORHYBRID_TIMED_CCT(...) ([&](){   double __tractor_joint_start = tractor_hybrid_now_seconds();   auto __tractor_joint_ret = (CCT_cpp)(__VA_ARGS__);   g_TRACTORHYBRID_joint_seconds += tractor_hybrid_now_seconds() - __tractor_joint_start;   return __tractor_joint_ret; }())
+
+#define TRACTORHYBRID_TIMED_SPA_ER(...) do {   double __tractor_joint_start = tractor_hybrid_now_seconds();   (SPA_ER_kernel_related_Phiadj_fast_new_cpp)(__VA_ARGS__);   g_TRACTORHYBRID_joint_seconds += tractor_hybrid_now_seconds() - __tractor_joint_start; } while(0)
+
+#define TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(...) do {   double __tractor_variance_start = tractor_hybrid_now_seconds();   (*ptr_gSAIGEobj).set_flagSparseGRM_cur(__VA_ARGS__);   g_TRACTORHYBRID_variance_seconds += tractor_hybrid_now_seconds() - __tractor_variance_start; } while(0)
+
+#define TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(...) do {   double __tractor_variance_start = tractor_hybrid_now_seconds();   (*ptr_gSAIGEobj).assignSingleVarianceRatio(__VA_ARGS__);   g_TRACTORHYBRID_variance_seconds += tractor_hybrid_now_seconds() - __tractor_variance_start; } while(0)
+
+#define TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(...) ([&](){   double __tractor_variance_start = tractor_hybrid_now_seconds();   auto __tractor_variance_ret = (*ptr_gSAIGEobj).assignVarianceRatio(__VA_ARGS__);   g_TRACTORHYBRID_variance_seconds += tractor_hybrid_now_seconds() - __tractor_variance_start;   return __tractor_variance_ret; }())
 // global objects for different analysis methods
 static SAIGE::SAIGEClass* ptr_gSAIGEobj = NULL;
 //single, SAIGE
@@ -294,16 +356,16 @@ void mainMarkerInCPP(
   arma::vec gtildeVec(n);
   arma::vec t_P2Vec;
   if(ptr_gSAIGEobj->m_isFastTest){
-    ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+    TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
   }else{
-    ptr_gSAIGEobj->set_flagSparseGRM_cur(ptr_gSAIGEobj->m_flagSparseGRM); 
+    TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(ptr_gSAIGEobj->m_flagSparseGRM);
   }
 
   bool hasVarRatio = true;;
   bool isSingleVarianceRatio = true;
   if((ptr_gSAIGEobj->m_varRatio_null).n_elem == 1){
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
-        //ptr_gSAIGEobj->assignSingleVarianceRatio(false);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        //TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(false);
   }else{		
 	isSingleVarianceRatio = false;
   }
@@ -371,7 +433,7 @@ void mainMarkerInCPP(
    if(!isReadMarker){
       //std::cout << "isReadMarker " << isReadMarker << std::endl;
       g_markerTestEnd = true;
-      bool isEndFile = check_Vcf_end();
+      bool isEndFile = (t_genoType == "tractor_hybrid") ? check_TRACTORHYBRID_end() : check_Vcf_end();
       break;
     }
 
@@ -443,7 +505,7 @@ void mainMarkerInCPP(
     indexNonZeroVec.clear();
 
 
-    flip = imputeGenoAndFlip(t_GVec, altFreq, altCounts,indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
+    flip = TRACTORHYBRID_TIMED_IMPUTE(t_GVec, altFreq, altCounts,indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
     MAC = std::min(altCounts, 2*n-altCounts);
     MAF = std::min(altFreq, 1 - altFreq);
 
@@ -479,16 +541,16 @@ void mainMarkerInCPP(
     //set_varianceRatio(MAC, isSingleVarianceRatio);
 
     if(ptr_gSAIGEobj->m_isFastTest){
-      ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+      TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
      
       if(isSingleVarianceRatio){
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{	
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
     }else{
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
     }
     //check 'Main.cpp'
@@ -521,12 +583,12 @@ void mainMarkerInCPP(
     }
 
     if(ptr_gSAIGEobj->m_isFastTest && pval_num < (ptr_gSAIGEobj->m_pval_cutoff_for_fastTest)){
-      ptr_gSAIGEobj->set_flagSparseGRM_cur(true);
+      TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(true);
 
       if(!isSingleVarianceRatio){ 
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{ 
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
 
 
@@ -719,9 +781,24 @@ bool Unified_getOneMarker(std::string & t_genoType,   // "PLINK", "BGEN", "Vcf"
   if(t_genoType == "vcf"){
     ptr_gVCFobj->getOneMarker(t_ref, t_alt, t_marker, t_pd, t_chr, t_altFreq, t_altCounts, t_missingRate, t_imputeInfo,
                                       t_isOutputIndexForMissing, t_indexForMissing, t_isOnlyOutputNonZero, t_indexForNonZero, isBoolRead, t_GVec, t_isImputation);
-    ptr_gVCFobj->move_forward_iterator(1);
+    if(t_genoType == "vcf"){
+      ptr_gVCFobj->move_forward_iterator(1);
+    }
+    if(t_genoType == "tractor_hybrid"){
+      ptr_gTRACTORHYBRIDobj->move_forward_iterator(1);
+    }
   }	  
  
+  if(t_genoType == "tractor_hybrid"){
+    double __tractor_get_marker_start = tractor_hybrid_now_seconds();
+    ptr_gTRACTORHYBRIDobj->getOneMarker(t_gIndex_prev, t_gIndex, t_ref, t_alt, t_marker, t_pd, t_chr,
+                                      t_altFreq, t_altCounts, t_missingRate, t_imputeInfo,
+                                      t_isOutputIndexForMissing, t_indexForMissing,
+                                      t_isOnlyOutputNonZero, t_indexForNonZero,
+                                      isBoolRead, t_GVec, t_isImputation);
+    g_TRACTORHYBRID_get_marker_seconds += tractor_hybrid_now_seconds() - __tractor_get_marker_start;
+  }
+
   if(g_is_rewrite_XnonPAR_forMales){
   	processMale_XnonPAR(t_GVec, t_pd, g_X_PARregion_mat);
 	t_altCounts = arma::sum(t_GVec);
@@ -759,6 +836,9 @@ uint32_t Unified_getSampleSizeinGeno(std::string & t_genoType){
     if(t_genoType == "vcf"){
        N0 = ptr_gVCFobj->getN0();
     }
+    if(t_genoType == "tractor_hybrid"){
+       N0 = ptr_gTRACTORHYBRIDobj->getN0();
+    }
     return(N0);
 }	
 
@@ -774,6 +854,9 @@ uint32_t Unified_getSampleSizeinAnalysis(std::string & t_genoType){
 
     if(t_genoType == "vcf"){
        N = ptr_gVCFobj->getN();
+    }
+    if(t_genoType == "tractor_hybrid"){
+       N = ptr_gTRACTORHYBRIDobj->getN();
     }
     return(N);
 }
@@ -816,7 +899,7 @@ void Unified_getMarkerPval(
       Rcpp::stop("When using SAIGE method to calculate marker-level p-values, 't_isOnlyOutputNonZero' should be false.");   
 
 
-    ptr_gSAIGEobj->getMarkerPval(t_GVec, t_indexForNonZero_vec, t_indexForZero_vec, t_Beta, t_seBeta, t_pval, t_pval_noSPA, t_altFreq, t_Tstat, t_gy, t_varT, t_isSPAConverge, t_gtilde, is_gtilde, is_region, t_P2Vec, t_isCondition, t_Beta_c, t_seBeta_c, t_pval_c, t_pval_noSPA_c, t_Tstat_c, t_varT_c, t_G1tilde_P_G2tilde_Vec, t_isFirth, t_isFirthConverge, t_isER); //SAIGE_new.cpp
+    TRACTORHYBRID_TIMED_GET_MARKER_PVAL(t_GVec, t_indexForNonZero_vec, t_indexForZero_vec, t_Beta, t_seBeta, t_pval, t_pval_noSPA, t_altFreq, t_Tstat, t_gy, t_varT, t_isSPAConverge, t_gtilde, is_gtilde, is_region, t_P2Vec, t_isCondition, t_Beta_c, t_seBeta_c, t_pval_c, t_pval_noSPA_c, t_Tstat_c, t_varT_c, t_G1tilde_P_G2tilde_Vec, t_isFirth, t_isFirthConverge, t_isER); //SAIGE_new.cpp
     
     //t_indexForNonZero_vec.clear();
   
@@ -873,6 +956,14 @@ void setVCFobjInCPP(std::string t_vcfFileName,
 
 bool isEnd = ptr_gVCFobj->check_iterator_end();
 
+}
+
+// [[Rcpp::export]]
+void setTRACTORHYBRIDobjInCPP(std::string t_prefix,
+            std::vector<std::string> & t_SampleInModel)
+{
+  tractor_hybrid_clear_condition_cache();
+  ptr_gTRACTORHYBRIDobj = new TRACTOR_HYBRID::TractorHybridClass(t_prefix, t_SampleInModel);
 }
 
 
@@ -1159,7 +1250,7 @@ Rcpp::List mainRegionInCPP(
   if((ptr_gSAIGEobj->m_varRatio_null).n_elem > 1){
     isSingleVarianceRatio = false;
   }else{
-    ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+    TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
   }  
   // initiate chunk information
   unsigned int nchunks = 0; //number of chunks
@@ -1255,11 +1346,11 @@ Rcpp::List mainRegionInCPP(
     double w0;
     double MAC = MAF * 2 * t_n * (1 - missingRate);   // checked on 08-10-2021
     if(!g_isadmixed){
-    	flip = imputeGenoAndFlip(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
+	flip = TRACTORHYBRID_TIMED_IMPUTE(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
     MAF = std::min(altFreq, 1 - altFreq);
     MAC = std::min(altCounts, t_n *2 - altCounts);
     }else{
-    	flip = imputeGenoAndFlip_fakeflip(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
+	flip = TRACTORHYBRID_TIMED_IMPUTE_FAKEFLIP(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
    	//GVec_sumdosage = GVec_sumdosage + GVec;
 	if(g_current_vcffield_ancestry != "DSALL"){
 		nanc = g_nanc_mat(i, g_current_ancestry_index);	
@@ -1311,9 +1402,9 @@ Rcpp::List mainRegionInCPP(
       }
 
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
 
 
@@ -1594,9 +1685,9 @@ if(g_isadmixed){
 
       indicatorVec.at(i) = 1;
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
 
 
@@ -1737,7 +1828,7 @@ if(i2 > 0){
 	  double w0;
 	  double MAC = MAF * 2 * t_n * (1 - missingRate);
 	  std::vector<uint32_t> indexForMissing;
-    	  flip = imputeGenoAndFlip(genoURVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
+	  flip = TRACTORHYBRID_TIMED_IMPUTE(genoURVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
 	  if(isWeightCustomized){
 	    //genoSumMat.col(jm) = genoSumMat.col(jm) + genoURVec % (weightURMat.col(jm));
 	    //genoSumMat.col(jm) = genoSumMat.col(jm) + genoURVec;
@@ -1767,9 +1858,9 @@ if(i2 > 0){
 
 
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
 
 
@@ -1788,9 +1879,9 @@ if(i2 > 0){
             indexNonZeroVec_arma = arma::conv_to<arma::uvec>::from(indexNonZeroVec);
 
 	    if(MAC <= g_MACCutoffforER && t_traitType == "binary"){	
-              ptr_gSAIGEobj->getMarkerPval(genoURVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, true, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, true);
+              TRACTORHYBRID_TIMED_GET_MARKER_PVAL(genoURVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, true, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, true);
 	    }else{
-              ptr_gSAIGEobj->getMarkerPval(genoURVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, true, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, false);
+              TRACTORHYBRID_TIMED_GET_MARKER_PVAL(genoURVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, true, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, false);
 
 	    }
 
@@ -2063,13 +2154,13 @@ if(t_regionTestType == "BURDEN"){
 	  std::vector<uint32_t> indexForMissing;
 
           if(!isSingleVarianceRatio){
-            hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+            hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
           }
 	  //arma::vec timeoutput_getp = getTime();
 	  if(MAC <= g_MACCutoffforER && t_traitType == "binary"){
-          ptr_gSAIGEobj->getMarkerPval(genoSumVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, isregion, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, true);
+          TRACTORHYBRID_TIMED_GET_MARKER_PVAL(genoSumVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, isregion, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, true);
 	  }else{
-          ptr_gSAIGEobj->getMarkerPval(genoSumVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, isregion, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, false);
+          TRACTORHYBRID_TIMED_GET_MARKER_PVAL(genoSumVec, indexNonZeroVec_arma, indexZeroVec_arma, Beta, seBeta, pval, pval_noSPA, altFreq, Tstat, gy, varT, isSPAConverge, gtildeVec, is_gtilde, isregion, P2Vec, isCondition, Beta_c, seBeta_c, pval_c, pval_noSPA_c, Tstat_c, varT_c, G1tilde_P_G2tilde_Vec, is_Firth, is_FirthConverge, false);
 	  }	  
 	  //arma::vec timeoutput_getp2 = getTime();
 	  //printTime(timeoutput_getp, timeoutput_getp2, "get p  done");
@@ -2125,11 +2216,11 @@ if(t_regionTestType == "BURDEN"){
 	  arma::vec nonMissingPvalVec = arma::conv_to< arma::vec >::from(nonMissingPvalVec_std);
 	  //arma::uvec nonMissingPvalVecInd = arma::find(BURDEN_pval_Vec >= 0);
 	  //arma::vec nonMissingPvalVec = BURDEN_pval_Vec.elem(nonMissingPvalVecInd);
-	   cctpval = CCT_cpp(nonMissingPvalVec);
+	   cctpval = TRACTORHYBRID_TIMED_CCT(nonMissingPvalVec);
            if(isCondition){
 	        //arma::vec nonMissingPvalVec_cond = BURDEN_pval_cVec.elem(nonMissingPvalVecInd);
 		arma::vec nonMissingPvalVec_cond  = arma::conv_to< arma::vec >::from(nonMissingPvalVec_c_std);
-	   	cctpval_cond = CCT_cpp(nonMissingPvalVec_cond);	   
+			cctpval_cond = TRACTORHYBRID_TIMED_CCT(nonMissingPvalVec_cond);
            }
 
 	
@@ -2427,12 +2518,12 @@ if(iswriteOutput){
                 SE_Burden,
                 error_code
                 );
-    std::string P_het_admixed_str = get_jointScore_pvalue(Scorevec, VarMat);
+    std::string P_het_admixed_str = TRACTORHYBRID_TIMED_GET_JOINT(Scorevec, VarMat);
     double P_het_admixed = convertStringtoDoublePval(P_het_admixed_str);
 
     arma::vec pvecforcct = {Pvalue_SKATO, P_het_admixed, P_hom_admixed};
-    //double P_cct_admixed = CCT_cpp(pvecforcct);
-    std::string P_cct_admixed_str = CCT_cpp(pvecforcct);
+    //double P_cct_admixed = TRACTORHYBRID_TIMED_CCT(pvecforcct);
+    std::string P_cct_admixed_str = TRACTORHYBRID_TIMED_CCT(pvecforcct);
 
 
     //OutFile << "\t";
@@ -2494,13 +2585,13 @@ if(iswriteOutput){
                 SE_Burden_cond,
                 error_code
                 );
-        std::string P_het_admixed_cond_str = get_jointScore_pvalue(Score_cond, Phi_cond);
+        std::string P_het_admixed_cond_str = TRACTORHYBRID_TIMED_GET_JOINT(Score_cond, Phi_cond);
 	double P_het_admixed_cond = convertStringtoDoublePval(P_het_admixed_cond_str); 
 	arma::vec pvecforcct_cond = {Pvalue_SKATO_cond, P_het_admixed_cond, P_hom_admixed_cond};
-        //double P_cct_admixed_cond = CCT_cpp(pvecforcct_cond);
+        //double P_cct_admixed_cond = TRACTORHYBRID_TIMED_CCT(pvecforcct_cond);
 	std::string Pvalue_SKATO_cond_str = convertDoubletoStringPval(Pvalue_SKATO_cond); 
 	std::vector<std::string> pvecforcct_cond_str = {Pvalue_SKATO_cond_str, P_het_admixed_cond_str, P_hom_admixed_cond_str}; 
-        std::string P_cct_admixed_cond_str = CCT_cpp(pvecforcct_cond);
+        std::string P_cct_admixed_cond_str = TRACTORHYBRID_TIMED_CCT(pvecforcct_cond);
 	if(P_cct_admixed_cond_str == "0"){
 		arma::uvec between0and1Indice = arma::find(pvecforcct_cond == 0.0);
 		P_cct_admixed_cond_str = pvecforcct_cond_str.at(between0and1Indice[0]);
@@ -2563,7 +2654,7 @@ void assign_conditionMarkers_factors(
 			   arma::vec & t_weight_cond
 			   )           // sample size
 {
-  ptr_gSAIGEobj->set_flagSparseGRM_cur(ptr_gSAIGEobj->m_flagSparseGRM);
+  TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(ptr_gSAIGEobj->m_flagSparseGRM);
   bool isImpute = false;	
   unsigned int q = t_genoIndex.size();
   arma::mat P1Mat(q, t_n);
@@ -2654,16 +2745,16 @@ void assign_conditionMarkers_factors(
 
   bool hasVarRatio;
   if((ptr_gSAIGEobj->m_varRatio_null).n_elem == 1){
-	ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM);	
+		TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM);
   }else{
-	hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM);
+	hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM);
 	//if(!hasVarRatio){
 	//	std::cout << "Error! Conditioning marker " << info << " has MAC " << MAC << " and does not have variance ratio estimated." << std::endl;
 	//	exit(EXIT_FAILURE);
 	//}	
   }	  
  
-  flip = imputeGenoAndFlip(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
+  flip = TRACTORHYBRID_TIMED_IMPUTE(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
 
 
  arma::uvec indexZeroVec_arma, indexNonZeroVec_arma;
@@ -2761,6 +2852,87 @@ bool check_Vcf_end(){
 // [[Rcpp::export]]
 void move_forward_iterator_Vcf(int i){
 	ptr_gVCFobj->move_forward_iterator(i);
+}
+
+// [[Rcpp::export]]
+void set_iterator_inTRACTORHYBRID(std::string chrom, int beg_pd, int end_pd){
+	ptr_gTRACTORHYBRIDobj->set_iterator(chrom, beg_pd, end_pd);
+}
+
+// [[Rcpp::export]]
+bool check_TRACTORHYBRID_end(){
+	return ptr_gTRACTORHYBRIDobj->check_iterator_end();
+}
+
+// [[Rcpp::export]]
+void move_forward_iterator_TRACTORHYBRID(int i){
+	ptr_gTRACTORHYBRIDobj->move_forward_iterator(i);
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_io_seconds(){
+	if(ptr_gTRACTORHYBRIDobj == NULL){
+		return 0.0;
+	}
+	return ptr_gTRACTORHYBRIDobj->get_io_seconds();
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_decode_seconds(){
+	if(ptr_gTRACTORHYBRIDobj == NULL){
+		return 0.0;
+	}
+	return ptr_gTRACTORHYBRIDobj->get_decode_seconds();
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_get_marker_seconds(){
+	return g_TRACTORHYBRID_get_marker_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_pvalue_seconds(){
+	return g_TRACTORHYBRID_marker_pvalue_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_output_seconds(){
+	return g_TRACTORHYBRID_output_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_reset_seconds(){
+	return g_TRACTORHYBRID_reset_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_condition_seconds(){
+	return g_TRACTORHYBRID_condition_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_impute_qc_seconds(){
+	return g_TRACTORHYBRID_impute_qc_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_joint_seconds(){
+	return g_TRACTORHYBRID_joint_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_variance_seconds(){
+	return g_TRACTORHYBRID_variance_seconds;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_condition_cache_hits(){
+	return g_TRACTORHYBRID_condition_cache_hits;
+}
+
+// [[Rcpp::export]]
+double get_TRACTORHYBRID_condition_cache_misses(){
+	return g_TRACTORHYBRID_condition_cache_misses;
 }
 
 
@@ -2861,6 +3033,8 @@ void closeGenoFile(std::string & t_genoType)
     ptr_gBGENobj->closegenofile();
   }else if(t_genoType == "vcf"){
     ptr_gVCFobj->closegenofile();
+  }else if(t_genoType == "tractor_hybrid"){
+    ptr_gTRACTORHYBRIDobj->closegenofile();
   }else if(t_genoType == "plink"){
     ptr_gPLINKobj->closegenofile();
   }	  
@@ -3149,12 +3323,12 @@ void writeOutfile_single(bool t_isMoreOutput,
 
 // [[Rcpp::export]]
 void set_flagSparseGRM_cur_SAIGE(bool t_flagSparseGRM_cur){
-	ptr_gSAIGEobj->set_flagSparseGRM_cur(t_flagSparseGRM_cur);
+	TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(t_flagSparseGRM_cur);
 }
 
 // [[Rcpp::export]]
 void set_flagSparseGRM_cur_SAIGE_org(){
-	ptr_gSAIGEobj->set_flagSparseGRM_cur(ptr_gSAIGEobj->m_flagSparseGRM);
+	TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(ptr_gSAIGEobj->m_flagSparseGRM);
 }
 
 
@@ -3162,18 +3336,18 @@ void set_flagSparseGRM_cur_SAIGE_org(){
 void set_varianceRatio(double MAC, bool isSingleVarianceRatio){
     bool hasVarRatio;
     if(!ptr_gSAIGEobj->m_isFastTest){
-       ptr_gSAIGEobj->set_flagSparseGRM_cur(ptr_gSAIGEobj->m_flagSparseGRM);
+       TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(ptr_gSAIGEobj->m_flagSparseGRM);
        if(!isSingleVarianceRatio){
-         hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM);
+         hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM);
        }else{
-         ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM);
+         TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM);
        }
      }else{
-       ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+       TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
        if(!isSingleVarianceRatio){
-         hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, false);
+         hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, false);
        }else{
-         ptr_gSAIGEobj->assignSingleVarianceRatio(false);
+         TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(false);
        }
      }
 }
@@ -3466,6 +3640,7 @@ int writeOutfile_singleInadmixed(bool t_isMoreOutput,
 			std::string markerName
 
 			){
+  double __tractor_output_start = tractor_hybrid_now_seconds();
   t_OutFile_singleInGroup << markerName;
   t_OutFile_singleInGroup << "\t";
   int numofAnc = 0;
@@ -3972,7 +4147,7 @@ void mainAdmixedInCPP_inner(
   if((ptr_gSAIGEobj->m_varRatio_null).n_elem > 1){
     isSingleVarianceRatio = false;
   }else{
-    ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+    TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
   }
 
 
@@ -4053,7 +4228,7 @@ void mainAdmixedInCPP_inner(
     double w0;
     double MAC = MAF * 2 * t_n * (1 - missingRate);   // checked on 08-10-2021
     
-    flip = imputeGenoAndFlip_fakeflip(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
+    flip = TRACTORHYBRID_TIMED_IMPUTE_FAKEFLIP(GVec, altFreq, altCounts, indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
     GVec_sumdosage = GVec_sumdosage + GVec;
 
 
@@ -4098,9 +4273,9 @@ void mainAdmixedInCPP_inner(
       //}
 
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
 
 
@@ -4262,9 +4437,9 @@ void mainAdmixedInCPP_inner(
 
       indicatorVec.at(i) = 1;
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
 
 
@@ -4469,12 +4644,12 @@ void mainAdmixedInCPP_inner(
                 SE_Burden,
                 error_code
                 );
-    std::string P_het_admixed_str = get_jointScore_pvalue(Scorevec, VarMat_sub);
-    //double P_het_admixed = get_jointScore_pvalue(Scorevec, VarMat_sub);
+    std::string P_het_admixed_str = TRACTORHYBRID_TIMED_GET_JOINT(Scorevec, VarMat_sub);
+    //double P_het_admixed = TRACTORHYBRID_TIMED_GET_JOINT(Scorevec, VarMat_sub);
     double P_het_admixed = convertStringtoDoublePval(P_het_admixed_str); 
     arma::vec pvecforcct = {Pvalue_SKAT, P_het_admixed, P_hom_admixed};
-    //double P_cct_admixed = CCT_cpp(pvecforcct);
-    std::string P_cct_admixed_str = CCT_cpp(pvecforcct);
+    //double P_cct_admixed = TRACTORHYBRID_TIMED_CCT(pvecforcct);
+    std::string P_cct_admixed_str = TRACTORHYBRID_TIMED_CCT(pvecforcct);
 
 /*
     OutFile << "\t";
@@ -4536,10 +4711,10 @@ void mainAdmixedInCPP_inner(
                 SE_Burden_cond,
                 error_code
                 );
-        std::string P_het_admixed_cond_str = get_jointScore_pvalue(Score_cond, Phi_cond);
+        std::string P_het_admixed_cond_str = TRACTORHYBRID_TIMED_GET_JOINT(Score_cond, Phi_cond);
         double P_het_admixed_cond = convertStringtoDoublePval(P_het_admixed_cond_str);
         arma::vec pvecforcct_cond = {Pvalue_SKATO_cond, P_het_admixed_cond, P_hom_admixed_cond};
-    std::string P_cct_admixed_cond_str = CCT_cpp(pvecforcct_cond);
+    std::string P_cct_admixed_cond_str = TRACTORHYBRID_TIMED_CCT(pvecforcct_cond);
 
 /*
     OutFile << "\t";
@@ -4603,6 +4778,16 @@ bool Unified_getOneMarker_Admixed(std::string & t_genoType,   // "PLINK", "BGEN"
     ptr_gVCFobj->getOneMarker(t_ref, t_alt, t_marker, t_pd, t_chr, t_altFreq, t_altCounts, t_missingRate, t_imputeInfo,
                                       t_isOutputIndexForMissing, t_indexForMissing, t_isOnlyOutputNonZero, t_indexForNonZero, isBoolRead, t_GVec, t_isImputation);
     //ptr_gVCFobj->move_forward_iterator(1);
+  }
+
+  if(t_genoType == "tractor_hybrid"){
+    double __tractor_get_marker_start = tractor_hybrid_now_seconds();
+    ptr_gTRACTORHYBRIDobj->getOneMarkerAdmixedField(t_gIndex_prev, t_gIndex, t_ref, t_alt, t_marker, t_pd, t_chr,
+                                      t_altFreq, t_altCounts, t_missingRate, t_imputeInfo,
+                                      t_isOutputIndexForMissing, t_indexForMissing,
+                                      t_isOnlyOutputNonZero, t_indexForNonZero,
+                                      isBoolRead, t_GVec, t_isImputation, t_vcfField);
+    g_TRACTORHYBRID_get_marker_seconds += tractor_hybrid_now_seconds() - __tractor_get_marker_start;
   }
 
   if(g_is_rewrite_XnonPAR_forMales){
@@ -4688,17 +4873,17 @@ void mainMarkerAdmixedInCPP(
   arma::vec gtildeVec(n);
   arma::vec t_P2Vec;
   if(ptr_gSAIGEobj->m_isFastTest){
-    ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+    TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
   }else{
-    ptr_gSAIGEobj->set_flagSparseGRM_cur(ptr_gSAIGEobj->m_flagSparseGRM);
+    TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(ptr_gSAIGEobj->m_flagSparseGRM);
   }
 
 
   bool hasVarRatio = true;;
   bool isSingleVarianceRatio = true;
   if((ptr_gSAIGEobj->m_varRatio_null).n_elem == 1){
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
-        //ptr_gSAIGEobj->assignSingleVarianceRatio(false);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        //TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(false);
   }else{
         isSingleVarianceRatio = false;
   }
@@ -4734,6 +4919,7 @@ void mainMarkerAdmixedInCPP(
       std::cout << "Completed " << (i+1) << "/" << q << " markers in the chunk." << std::endl;
     }
     bool isSPAjoint = false;
+    double __tractor_reset_start = tractor_hybrid_now_seconds();
     t_GVecHom.zeros();
     Scorevec.fill(arma::datum::nan);
     PvalvecallAnc.fill(arma::datum::nan);
@@ -4743,6 +4929,7 @@ void mainMarkerAdmixedInCPP(
     P1Mat.zeros();
     P2Mat.zeros();
     G1tilde_P_G2tilde_Mat.zeros();
+    g_TRACTORHYBRID_reset_seconds += tractor_hybrid_now_seconds() - __tractor_reset_start;
     numancresults = 0;
     double nanc_case, nanc_ctrl;
     
@@ -4777,7 +4964,37 @@ void mainMarkerAdmixedInCPP(
     arma::uvec not_nan_anc_indices_vec(t_NumberofANC);
     std::vector<std::string> pvalHap_pervatiant_Vec(t_NumberofANC);
     bool isconditiononHaplo;
-    assign_conditionHaplotypes(
+    uint32_t __tractor_condition_block_id = UINT32_MAX;
+    bool __tractor_condition_cache_hit = false;
+
+    if(t_genoType == "tractor_hybrid" && ptr_gTRACTORHYBRIDobj != NULL){
+      __tractor_condition_block_id = ptr_gTRACTORHYBRIDobj->blockIdForMarker(gIndex);
+      if(g_TRACTORHYBRID_condition_cache_valid &&
+         g_TRACTORHYBRID_condition_cache_block_id == __tractor_condition_block_id &&
+         g_TRACTORHYBRID_condition_cache_n_anc == t_NumberofANC &&
+         g_TRACTORHYBRID_condition_cache_cutoff == t_pvalcutoff_of_haplotype &&
+         g_TRACTORHYBRID_condition_cache_trait == t_traitType){
+        nanc_case_vec = g_TRACTORHYBRID_condition_cache_nanc_case_vec;
+        nanc_ctrl_vec = g_TRACTORHYBRID_condition_cache_nanc_ctrl_vec;
+        nanc_vec = g_TRACTORHYBRID_condition_cache_nanc_vec;
+        not_nan_anc_indices_vec = g_TRACTORHYBRID_condition_cache_not_nan_anc_indices_vec;
+        isconditiononHaplo = g_TRACTORHYBRID_condition_cache_isconditiononHaplo;
+        ptr_gSAIGEobj->m_P2Mat_cond = g_TRACTORHYBRID_condition_cache_P2Mat_cond;
+        ptr_gSAIGEobj->m_VarInvMat_cond = g_TRACTORHYBRID_condition_cache_VarInvMat_cond;
+        ptr_gSAIGEobj->m_VarMat_cond = g_TRACTORHYBRID_condition_cache_VarMat_cond;
+        ptr_gSAIGEobj->m_Tstat_cond = g_TRACTORHYBRID_condition_cache_Tstat_cond;
+        ptr_gSAIGEobj->m_G2_Weight_cond = g_TRACTORHYBRID_condition_cache_G2_Weight_cond;
+        ptr_gSAIGEobj->m_MAF_cond = g_TRACTORHYBRID_condition_cache_MAF_cond;
+        ptr_gSAIGEobj->m_qsum_cond = g_TRACTORHYBRID_condition_cache_qsum_cond;
+        ptr_gSAIGEobj->m_gsum_cond = g_TRACTORHYBRID_condition_cache_gsum_cond;
+        ptr_gSAIGEobj->m_p_cond = g_TRACTORHYBRID_condition_cache_p_cond;
+        g_TRACTORHYBRID_condition_cache_hits += 1.0;
+        __tractor_condition_cache_hit = true;
+      }
+    }
+
+    if(!__tractor_condition_cache_hit){
+      TRACTORHYBRID_TIMED_ASSIGN_CONDITION(
     		t_traitType,
                            t_genoType,     //"vcf"
                            n,
@@ -4791,6 +5008,30 @@ void mainMarkerAdmixedInCPP(
 			   t_pvalcutoff_of_haplotype,
 			   isconditiononHaplo
                            );           // sample size
+
+      if(t_genoType == "tractor_hybrid" && __tractor_condition_block_id != UINT32_MAX){
+        g_TRACTORHYBRID_condition_cache_valid = true;
+        g_TRACTORHYBRID_condition_cache_block_id = __tractor_condition_block_id;
+        g_TRACTORHYBRID_condition_cache_n_anc = t_NumberofANC;
+        g_TRACTORHYBRID_condition_cache_cutoff = t_pvalcutoff_of_haplotype;
+        g_TRACTORHYBRID_condition_cache_trait = t_traitType;
+        g_TRACTORHYBRID_condition_cache_nanc_case_vec = nanc_case_vec;
+        g_TRACTORHYBRID_condition_cache_nanc_ctrl_vec = nanc_ctrl_vec;
+        g_TRACTORHYBRID_condition_cache_nanc_vec = nanc_vec;
+        g_TRACTORHYBRID_condition_cache_not_nan_anc_indices_vec = not_nan_anc_indices_vec;
+        g_TRACTORHYBRID_condition_cache_isconditiononHaplo = isconditiononHaplo;
+        g_TRACTORHYBRID_condition_cache_P2Mat_cond = ptr_gSAIGEobj->m_P2Mat_cond;
+        g_TRACTORHYBRID_condition_cache_VarInvMat_cond = ptr_gSAIGEobj->m_VarInvMat_cond;
+        g_TRACTORHYBRID_condition_cache_VarMat_cond = ptr_gSAIGEobj->m_VarMat_cond;
+        g_TRACTORHYBRID_condition_cache_Tstat_cond = ptr_gSAIGEobj->m_Tstat_cond;
+        g_TRACTORHYBRID_condition_cache_G2_Weight_cond = ptr_gSAIGEobj->m_G2_Weight_cond;
+        g_TRACTORHYBRID_condition_cache_MAF_cond = ptr_gSAIGEobj->m_MAF_cond;
+        g_TRACTORHYBRID_condition_cache_qsum_cond = ptr_gSAIGEobj->m_qsum_cond;
+        g_TRACTORHYBRID_condition_cache_gsum_cond = ptr_gSAIGEobj->m_gsum_cond;
+        g_TRACTORHYBRID_condition_cache_p_cond = ptr_gSAIGEobj->m_p_cond;
+        g_TRACTORHYBRID_condition_cache_misses += 1.0;
+      }
+    }
 
 
     G1tilde_P_G2tilde_Mat.set_size(t_NumberofANC, ptr_gSAIGEobj->m_VarInvMat_cond.n_rows);
@@ -4828,16 +5069,16 @@ void mainMarkerAdmixedInCPP(
     G1tilde_P_G2tilde_Vec.clear();
 
     if(ptr_gSAIGEobj->m_isFastTest){
-      ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+      TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
 
       if(isSingleVarianceRatio){
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
     }else{
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
     }
 
@@ -4901,7 +5142,7 @@ void mainMarkerAdmixedInCPP(
    if(!isReadMarker){
       //std::cout << "isReadMarker " << isReadMarker << std::endl;
       g_markerTestEnd = true;
-      bool isEndFile = check_Vcf_end();
+      bool isEndFile = (t_genoType == "tractor_hybrid") ? check_TRACTORHYBRID_end() : check_Vcf_end();
       //break;
       goto exit_loops;
     }
@@ -5015,7 +5256,7 @@ void mainMarkerAdmixedInCPP(
     indexNonZeroVec.clear();
 
 
-    flip = imputeGenoAndFlip_fakeflip(t_GVec, altFreq, altCounts,indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
+    flip = TRACTORHYBRID_TIMED_IMPUTE_FAKEFLIP(t_GVec, altFreq, altCounts,indexForMissing, g_impute_method, g_dosage_zerod_cutoff, g_dosage_zerod_MAC_cutoff, MAC, indexZeroVec, indexNonZeroVec);
     MAC = std::min(altCounts, nanc-altCounts);
     MAF = std::min(altFreq, 1 - altFreq);
 
@@ -5049,16 +5290,16 @@ void mainMarkerAdmixedInCPP(
     //set_varianceRatio(MAC, isSingleVarianceRatio);
 
     if(ptr_gSAIGEobj->m_isFastTest){
-      ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+      TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
 
       if(isSingleVarianceRatio){
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
     }else{
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
     }
     //check 'Main.cpp'
@@ -5181,7 +5422,7 @@ void mainMarkerAdmixedInCPP(
 	}
 
 	if(t_traitType == "binary" && isSPAjoint){
-		SPA_ER_kernel_related_Phiadj_fast_new_cpp(PvalvecallAncsub, 
+		TRACTORHYBRID_TIMED_SPA_ER(PvalvecallAncsub,
 							Scorevecsub,
 							VarMat,
 							P_hom_admixed,
@@ -5191,11 +5432,11 @@ void mainMarkerAdmixedInCPP(
 
    	//arma::mat VarMat = P1Mat * P2Mat;
 	
-	std::string P_het_admixed_str = get_jointScore_pvalue(Scorevecsub, VarMat);
+	std::string P_het_admixed_str = TRACTORHYBRID_TIMED_GET_JOINT(Scorevecsub, VarMat);
 	double P_het_admixed = convertStringtoDoublePval(P_het_admixed_str);
 	arma::vec pvecforcct = {P_het_admixed, P_hom_admixed};
-    	//double P_cct_admixed = CCT_cpp(pvecforcct);
-    	std::string P_cct_admixed_str = CCT_cpp(pvecforcct);
+	//double P_cct_admixed = TRACTORHYBRID_TIMED_CCT(pvecforcct);
+	std::string P_cct_admixed_str = TRACTORHYBRID_TIMED_CCT(pvecforcct);
 	if(P_cct_admixed_str == "0"){
 	   if(P_hom_admixed == 0){
 	   	P_cct_admixed_str = P_hom_admixed_str;
@@ -5229,16 +5470,16 @@ void mainMarkerAdmixedInCPP(
             arma::vec TstatAdjCond = AdjCondMat * (ptr_gSAIGEobj->m_Tstat_cond);
 	    arma::vec Scorevec_cond = Scorevecsub - TstatAdjCond;
 	    arma::mat VarMat_cond = VarMat - VarMatAdjCond;
-	    //double P_het_admixed_cond = get_jointScore_pvalue(Scorevec_cond, VarMat_cond);	
-	    std::string P_het_admixed_cond_str = get_jointScore_pvalue(Scorevec_cond, VarMat_cond);
+		    //double P_het_admixed_cond = TRACTORHYBRID_TIMED_GET_JOINT(Scorevec_cond, VarMat_cond);
+	    std::string P_het_admixed_cond_str = TRACTORHYBRID_TIMED_GET_JOINT(Scorevec_cond, VarMat_cond);
 	    double P_het_admixed_cond = convertStringtoDoublePval(P_het_admixed_cond_str);
 	    //double P_hom_admixed_cond = convertStringtoDoublePval(pval_c);
 	    double P_hom_admixed_cond = convertStringtoDoublePval(pval);
 	    //std::string P_hom_admixed_cond_str = pval_c;
 	    std::string P_hom_admixed_cond_str = pval;
 	    arma::vec pvecforcct_cond = {P_het_admixed_cond, P_hom_admixed_cond};
-            //double P_cct_admixed_cond = CCT_cpp(pvecforcct_cond);
-            std::string P_cct_admixed_cond_str = CCT_cpp(pvecforcct_cond);
+            //double P_cct_admixed_cond = TRACTORHYBRID_TIMED_CCT(pvecforcct_cond);
+            std::string P_cct_admixed_cond_str = TRACTORHYBRID_TIMED_CCT(pvecforcct_cond);
 	    //std::string P_het_admixed_cond_str = convertDoubletoStringPval(P_het_admixed_cond);
             //std::string P_hom_admixed_cond_str = convertDoubletoStringPval(P_hom_admixed_cond);
             //std::string P_cct_admixed_cond_str = convertDoubletoStringPval(P_cct_admixed_cond);
@@ -5285,7 +5526,12 @@ void mainMarkerAdmixedInCPP(
 
 
     }//for(int j = 0; j < t_NumberofANC; j++)
-    ptr_gVCFobj->move_forward_iterator(1);
+    if(t_genoType == "vcf"){
+      ptr_gVCFobj->move_forward_iterator(1);
+    }
+    if(t_genoType == "tractor_hybrid"){
+      ptr_gTRACTORHYBRIDobj->move_forward_iterator(1);
+    }
   }//i
 
 
@@ -5294,6 +5540,7 @@ void mainMarkerAdmixedInCPP(
   exit_loops:
   	std::cout << "the end of file" << std::endl;
   //output
+  double __tractor_output_new_start = tractor_hybrid_now_seconds();
   writeOutfile_single_admixed_new(t_isMoreOutput,
       t_isImputation,
       isCondition,
@@ -5340,6 +5587,7 @@ void mainMarkerAdmixedInCPP(
   pvalAdmixed_cVec,
   t_NumberofANC,
   pvalHap_Vec);
+  g_TRACTORHYBRID_output_seconds += tractor_hybrid_now_seconds() - __tractor_output_new_start;
 
 }
 
@@ -5805,8 +6053,8 @@ if(nanc > 0){
   bool hasVarRatio = true;;
   bool isSingleVarianceRatio = true;
   if((ptr_gSAIGEobj->m_varRatio_null).n_elem == 1){
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
-        //ptr_gSAIGEobj->assignSingleVarianceRatio(false);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        //TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(false);
   }else{
         isSingleVarianceRatio = false;
   }
@@ -5814,16 +6062,16 @@ if(nanc > 0){
 
 
   if(ptr_gSAIGEobj->m_isFastTest){
-      ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+      TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
 
       if(isSingleVarianceRatio){
-        ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }else{
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
     }else{
       if(!isSingleVarianceRatio){
-        hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+        hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
       }
   }
 
@@ -6085,23 +6333,23 @@ void assign_conditionHaplotypes_Region(
           bool hasVarRatio = true;;
           bool isSingleVarianceRatio = true;
           if((ptr_gSAIGEobj->m_varRatio_null).n_elem == 1){
-            ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
-            //ptr_gSAIGEobj->assignSingleVarianceRatio(false);
+            TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+            //TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(false);
           }else{
             isSingleVarianceRatio = false;
           }
 
           if(ptr_gSAIGEobj->m_isFastTest){
-              ptr_gSAIGEobj->set_flagSparseGRM_cur(false);
+              TRACTORHYBRID_TIMED_SET_SPARSE_FLAG(false);
 
             if(isSingleVarianceRatio){
-              ptr_gSAIGEobj->assignSingleVarianceRatio(ptr_gSAIGEobj->m_flagSparseGRM_cur);
+              TRACTORHYBRID_TIMED_ASSIGN_SINGLE_VARIANCE(ptr_gSAIGEobj->m_flagSparseGRM_cur);
             }else{
-              hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+              hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
             }
           }else{
             if(!isSingleVarianceRatio){
-              hasVarRatio = ptr_gSAIGEobj->assignVarianceRatio(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
+              hasVarRatio = TRACTORHYBRID_TIMED_ASSIGN_VARIANCE(MAC_anc, ptr_gSAIGEobj->m_flagSparseGRM_cur);
             }
           }
 
@@ -6183,7 +6431,12 @@ void assign_conditionHaplotypes_Region(
      }//if(j < q1){ //do not need to test the last ancestry
     } // End ancestry loop
 
-    ptr_gVCFobj->move_forward_iterator(1);
+    if(t_genoType == "vcf"){
+      ptr_gVCFobj->move_forward_iterator(1);
+    }
+    if(t_genoType == "tractor_hybrid"){
+      ptr_gTRACTORHYBRIDobj->move_forward_iterator(1);
+    }
 
   } // End marker loop - Fixed: Added missing closing brace
   
@@ -6347,4 +6600,3 @@ void set_isCondition_inSAIGE(bool t_isCondition){
 void set_pvalcutoff_of_haplotype(double t_pvalcutoff_of_haplotype_group){
     g_pvalcutoff_of_haplotype_group = t_pvalcutoff_of_haplotype_group;
 }
-

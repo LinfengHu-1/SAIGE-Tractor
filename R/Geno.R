@@ -30,7 +30,8 @@ checkGenoInput = function(bgenFile = "",
                  bedFile="",
                  bimFile="",
                  famFile="", 
-		 sampleInModel = NULL){
+		 sampleInModel = NULL,
+                 tractorHybridPrefix = ""){
    
     if(is.null(sampleInModel)){
     	stop("sampleInModel is not specified.")
@@ -81,6 +82,17 @@ checkGenoInput = function(bgenFile = "",
 	vcfFileIndex = savFileIndex
         dosageFileType = "vcf"
 
+    }else if(tractorHybridPrefix != ""){
+        Check_File_Exist(paste0(tractorHybridPrefix, ".meta"), "tractorHybridPrefix meta")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".samples"), "tractorHybridPrefix samples")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".common.variant.mks"), "tractorHybridPrefix common mks")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".rare.variant.mks"), "tractorHybridPrefix rare mks")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".common.geno.bin"), "tractorHybridPrefix common bin")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".rare.carrier.bin"), "tractorHybridPrefix rare bin")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".ancblock.bin"), "tractorHybridPrefix anc bin")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".ancblock.mks"), "tractorHybridPrefix anc mks")
+        Check_File_Exist(paste0(tractorHybridPrefix, ".ancblock.idx"), "tractorHybridPrefix anc idx")
+        dosageFileType = "tractor_hybrid"
     }else if(bedFile != ""){
 	Check_File_Exist(bedFile, "bedFile")
 	if(bimFile == ""){
@@ -134,7 +146,8 @@ setGenoInput = function(bgenFile = "",
                  rangestoIncludeFile = "",
                  chrom = "",
 		 AlleleOrder = NULL,
-		 sampleInModel = NULL)
+		 sampleInModel = NULL,
+		 tractorHybridPrefix = "")
 {
 
   #time_geno_0 = proc.time()
@@ -149,7 +162,8 @@ setGenoInput = function(bgenFile = "",
                  bedFile = bedFile,
                  bimFile = bimFile,
                  famFile = famFile,
-		 sampleInModel = sampleInModel)
+		 sampleInModel = sampleInModel,
+                 tractorHybridPrefix = tractorHybridPrefix)
 
   #time_geno_1 = proc.time()
 
@@ -304,6 +318,14 @@ setGenoInput = function(bgenFile = "",
     #  stop("chrom needs to be specified for VCF/BCF/SAV input\n")
     #}
     markerInfo = NULL
+  }
+
+  if(dosageFileType == "tractor_hybrid"){
+    if(idstoIncludeFile != "" | rangestoIncludeFile != ""){
+      stop("tractor_hybrid streaming step2 currently supports chromosome traversal only; do not set idstoIncludeFile or rangestoIncludeFile\n")
+    }
+    markerInfo = NULL
+    setTRACTORHYBRIDobjInCPP(tractorHybridPrefix, sampleInModel)
   }
 
 

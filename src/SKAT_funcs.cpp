@@ -1575,13 +1575,45 @@ if(r_corr.n_elem > 1){
 }
 
 
+// Module-local counter so users can grep stderr for [SAIGE-Tractor] lines and
+// know how many SNPs landed on the singular-Phi fallback path in this run.
+static unsigned long g_joint_pvalue_fallback_count = 0;
+
 // [[Rcpp::export]]
 std::string get_jointScore_pvalue(arma::vec& Score, arma::mat& Phi) {
-    arma::mat Phi_inv = arma::inv(Phi); // Inverse of Phi
-    double Teststat = arma::as_scalar(Score.t() * Phi_inv * Score);
-    
-    // Degrees of freedom
+    // Phi is the K x K ancestry-stratified score covariance. It is SPD by
+    // construction, but can be numerically singular when one ancestry has
+    // essentially no carriers (or near-collinear residualised dosages) in the
+    // phenotype's analysis sample. Use the boolean overload of inv_sympd and
+    // fall back to a Moore-Penrose pseudoinverse on failure so the chunk does
+    // not halt.
+    arma::mat Phi_sym = arma::symmatu(Phi);
+    arma::mat Phi_inv;
+    bool ok = arma::inv_sympd(Phi_inv, Phi_sym);
     int df = Score.n_elem;
+    if (!ok) {
+        ++g_joint_pvalue_fallback_count;
+        double rc = arma::rcond(Phi_sym);
+        Rcpp::Rcerr << "[SAIGE-Tractor] get_jointScore_pvalue: Phi singular at"
+                    << " fallback #" << g_joint_pvalue_fallback_count
+                    << ", inv_sympd failed; rcond=" << rc
+                    << ", Phi.diag()=" << Phi_sym.diag().t();
+        bool ok_pinv = arma::pinv(Phi_inv, Phi_sym);
+        if (!ok_pinv) {
+            Rcpp::Rcerr << "[SAIGE-Tractor] get_jointScore_pvalue:"
+                        << " pinv also failed, returning NA." << std::endl;
+            return std::string("NA");
+        }
+        df = static_cast<int>(arma::rank(Phi_sym));
+        if (df < 1) {
+            Rcpp::Rcerr << "[SAIGE-Tractor] get_jointScore_pvalue:"
+                        << " rank(Phi)=0 after pinv, returning NA." << std::endl;
+            return std::string("NA");
+        }
+        Rcpp::Rcerr << "[SAIGE-Tractor] get_jointScore_pvalue:"
+                    << " using pinv with effective df=" << df << std::endl;
+    }
+    double Teststat = arma::as_scalar(Score.t() * Phi_inv * Score);
     
     // Debugging print statements (optional, remove in production)
     //Rcpp::Rcout << "Score:" << std::endl << Score << std::endl;

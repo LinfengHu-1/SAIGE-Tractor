@@ -188,6 +188,28 @@ void scoreTestFast(arma::vec & t_GVec,
 
     arma::sp_mat gen_sp_SigmaMat();
 
+    // RHE cross-ancestry rg: null-model constants for the residual (sigma2_e)
+    // component. Returns {trace(Sigma^-1), res·res, n}. trace(Sigma^-1) is exact
+    // for the non-sparse working covariance (Sigma^-1 = diag(mu2)*tau); for the
+    // sparse-GRM path it is estimated with n_probe Hutchinson probes.
+    arma::vec getRHEnullConstants(int n_probe, unsigned int seed);
+
+    // RHE: covariate-adjust a genotype vector and apply Sigma^-1, reusing the
+    // variance-ratio machinery (same as scoreTest). Fills gtilde = adjusted G and
+    // P2Vec = Sigma^-1 gtilde. Used to build the radmix ancestry GRM components.
+    void getGtildeAndP2(const arma::vec& G, arma::vec& gtilde, arma::vec& P2Vec);
+    const arma::vec& m_res_for_rhe() const { return m_res; }   // working residual
+    double m_tau_for_rhe() const { return m_tauvec[0]; }       // tau
+    const std::string& m_traitType_for_rhe() const { return m_traitType; }
+    double m_caseProp_for_rhe() const { return arma::mean(m_y); }  // sample case prop (binary)
+    bool isNonSparseDiag_for_rhe() const;       // is Sigma^-1 a fixed diagonal? (-> Kr=D%Ar)
+    arma::vec getRHEsigmaInvDiag() const;       // the length-N diagonal D = mu2*tau
+    // RHE-PCGC for binary: covariate-residualized standardized phenotype. The
+    // GLMM observed residual (Y-mu) gives anti-correlated ancestry scores for
+    // binary; the linear/PCGC-standardized phenotype residual recovers rg
+    // correctly (the PCGC c^2 factor cancels in the rg ratio). Caches on first call.
+    arma::vec getPCGCphenoResidual();
+
     bool assignVarianceRatio(double MAC, bool issparseforVR);
 
     void assignSingleVarianceRatio(bool issparseforVR);

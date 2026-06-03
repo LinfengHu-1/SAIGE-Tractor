@@ -9,6 +9,10 @@
 // std::this_thread::sleep_for (std::chrono::seconds(1));
 #include <cstdio>         // std::remove
 #include <fstream>
+#include <random>         // RHE probe generation (mt19937)
+#include <sstream>        // RHE --rg_pairs parsing
+#include <unordered_set>  // RHE --rg_markerFile / --h2_markerFile membership
+#include <fstream>        // RHE marker-file loading
 #include <string.h>
 // Currently, omp does not work well, will check it later
 // error: SET_VECTOR_ELT() can only be applied to a 'list', not a 'character'
@@ -166,6 +170,335 @@ double g_maxMAFLimit;
 unsigned int g_region_maxMarkers_cutoff;   // maximal number of markers in one chunk, only used for region-based analysis to reduce memory usage
 bool g_isOutputMoreDetails;
 int g_marker_chunksize;
+bool g_isOutputCrossAncCov = false;  // admixed: output cross-ancestry score covariance (for rho_w)
+
+// ===================== RHE cross-ancestry rg accumulator =====================
+// Integrated into the step2 admixed loop (single genotype read). Reuses step2's
+// variance-ratio metrics per marker per ancestry: gtilde (=P1Mat.row, A-side),
+// Sigma^-1 gtilde (=P2Mat.col, K-side), and the score (Tstat). PLAIN +/-1 probes,
+// regenerated deterministically from a shared seed so partial accumulators from
+// separate chunks/chromosomes are additive. Writes a per-chunk partial sidecar;
+// the final rg solve happens in R (combine step). See PLAN_rhe_in_saige_tractor.md.
+struct RHEState {
+  bool on = false;
+  bool pcgc = false;               // binary: use PCGC linear phenotype residual
+  arma::vec pcgc_res;              // cached PCGC residual (binary)
+  int B = 30;
+  unsigned int seed = 1;
+  int K = 0;                       // number of ancestries
+  int G = 1;                       // # jackknife blocks written within this run
+  uint64_t markerCounter = 0;      // running kept-marker index -> block = counter % G
+  bool isBinary = false;           // trait type (for liability-scale h2 in R)
+  double caseProp = 0.0;           // sample case proportion P (binary; for Lee 2011)
+  arma::uword n = 0;               // number of samples
+  bool inited = false;
+  arma::mat probes;                // n x B, +/-1 (same across chunks via seed)
+  // OPTIONAL marker subsets (for cost control / correct marker sets per estimand):
+  //   rgMarkerSet : restrict the rg components (kind 0/1/3/4) to these markers
+  //                 (rg tolerates aggressive LD-pruning, e.g. ~200k).
+  //   h2MarkerSet : restrict the per-ancestry h2 components (kind 2) to these
+  //                 markers (h2 is tagging-limited -> use a fuller set, e.g. HM3 1M).
+  // A marker matches if its variant id OR "chr:pos" is in the set. Empty set =>
+  // no restriction for that estimand (use every tested marker).
+  std::unordered_set<std::string> rgMarkerSet, h2MarkerSet;
+  bool hasRgMarkerSet = false, hasH2MarkerSet = false;
+  std::string rgMarkerFile, h2MarkerFile;     // paths (loaded once at init)
+  // per-marker membership for the current marker (set in the DS-read block):
+  bool curRgKeep = true, curH2Keep = true;
+  // OPTIONS (layered on top of the default joint all-K analysis "A"):
+  std::string pairSpec;            // --rg_pairs ("" => A: joint all-K rg). If set,
+                                   // rg is estimated COHERENTLY per listed pair on
+                                   // M_ab (markers polymorphic in both) instead of A.
+  bool perAncestryH2 = false;      // --rg_perAncestryH2: also estimate each ancestry's
+                                   // h2 on its OWN markers M_a (proper per-ancestry h2).
+  std::vector<std::pair<int,int>> pairList;  // 0-indexed (a<b); requested pairs
+  // COMPONENT DESCRIPTORS: every estimate is one or more GRM components, each with a
+  // "keep rule" that fixes its marker set. kind: 0=A-diag,1=A-cross (both keep=allK,
+  // on M_all-K); 2=h2-diag (keep=anc a passes, on M_a); 3=pair-diag,4=pair-cross
+  // (keep=both a,b pass, on M_ab). gA,gB = GRM ancestries (diag if gA==gB). kA,kB =
+  // ancestries that must pass. pairId indexes pairList for kinds 3/4 (else -1).
+  struct Comp { int gA, gB, kA, kB, kind, pairId; bool allK; };
+  std::vector<Comp> comps;
+  int ncomp = 0;
+  // MEMORY: accumulators in SINGLE precision (RHE trace estimates; float32 below the
+  // B-noise floor). K-SIDE REUSE: non-sparse path has Sigma^-1 g = D % g (fixed
+  // diagonal D), so Kr = D % Ar -> not stored (storeKr=false), reconstructed in R.
+  bool storeKr = true;
+  arma::vec sigmaInvDiag;          // length n: D = mu2*tau (non-sparse; for Kr=D%Ar)
+  std::vector<std::vector<arma::fmat>> Ar;  // [G][ncomp] A-side (float32)
+  std::vector<std::vector<arma::fmat>> Kr;  // [G][ncomp] K-side (float32; sparse only)
+  // per-component scalars (unified): DIAG comp -> scoreSum=sum Score_a^2, var=sum
+  // g̃_a'Sig^-1 g̃_a; CROSS comp -> scoreSum=sum Score_a Score_b, var=sum g̃_a'Sig^-1 g̃_b.
+  std::vector<arma::vec> compScoreSum;     // [G] length ncomp
+  std::vector<arma::vec> compVar;          // [G] length ncomp
+  std::vector<arma::vec> Mcomp;            // [G] length ncomp (per-component counts)
+  std::vector<uint64_t> Mblk;              // [G] total kept markers per block (reporting)
+  // per-marker buffer (filled across the inner ancestry loop)
+  std::vector<arma::vec> bufGt, bufP2;
+  std::vector<double> bufScore;
+  std::vector<char> bufHas;
+};
+static RHEState g_rhe;
+// per-marker-per-ancestry scratch for exposure-centered radmix component (set in
+// the DS-read block, consumed at the accumulation hook):
+static arma::vec g_rhe_Xa;          // raw ancestry-a dosage X_a
+static arma::vec g_rhe_nanc_vec;    // per-individual ancestry-a haplotype count n_a
+static double    g_rhe_pa = 0.0;    // ancestry-a ALT freq per haplotype p_a
+static bool      g_rhe_has_anc = false;
+
+// Parse --rg_pairs ("1-2,1-3,3-4"; 1-indexed) into 0-indexed (a<b) pairs. Empty or
+// "all" => all K(K-1)/2 pairs. Invalid tokens are skipped with a warning.
+static std::vector<std::pair<int,int>> rhe_parse_pairs(const std::string& spec, int K){
+  std::vector<std::pair<int,int>> out;
+  std::string s = spec;
+  // trim
+  while(!s.empty() && (s.front()==' '||s.front()=='\t')) s.erase(s.begin());
+  while(!s.empty() && (s.back()==' '||s.back()=='\t')) s.pop_back();
+  if(s.empty() || s=="all" || s=="ALL"){
+    for(int a=0;a<K;a++) for(int b=a+1;b<K;b++) out.push_back({a,b});
+    return out;
+  }
+  std::stringstream ss(s); std::string tok;
+  while(std::getline(ss, tok, ',')){
+    size_t dash = tok.find('-');
+    if(dash==std::string::npos){ std::cerr<<"[RHE] skipping bad pair token '"<<tok<<"'\n"; continue; }
+    int a = std::atoi(tok.substr(0,dash).c_str()) - 1;   // 1-indexed -> 0
+    int b = std::atoi(tok.substr(dash+1).c_str()) - 1;
+    if(a<0||b<0||a>=K||b>=K||a==b){ std::cerr<<"[RHE] skipping out-of-range pair '"<<tok<<"' (K="<<K<<")\n"; continue; }
+    if(a>b) std::swap(a,b);
+    out.push_back({a,b});
+  }
+  return out;
+}
+
+// Load a marker-id list (one token per line; first whitespace-delimited field) into
+// a set. Accepts variant ids and/or "chr:pos" keys (membership tests both forms).
+static void rhe_load_marker_file(const std::string& path, std::unordered_set<std::string>& dest){
+  if(path.empty()) return;
+  std::ifstream in(path);
+  if(!in){ std::cerr << "[RHE] WARNING: cannot open marker file " << path << " (ignored)\n"; return; }
+  std::string line, tok;
+  while(std::getline(in, line)){
+    std::istringstream ls(line);
+    if(ls >> tok) dest.insert(tok);
+  }
+  std::cout << "[RHE] loaded " << dest.size() << " markers from " << path << "\n";
+}
+
+static void rhe_init_if_needed(arma::uword n, int K){
+  if(!g_rhe.on || g_rhe.inited) return;
+  g_rhe.n = n; g_rhe.K = K;
+  // load optional marker subsets (once); empty => no restriction.
+  rhe_load_marker_file(g_rhe.rgMarkerFile, g_rhe.rgMarkerSet);
+  rhe_load_marker_file(g_rhe.h2MarkerFile, g_rhe.h2MarkerSet);
+  g_rhe.hasRgMarkerSet = !g_rhe.rgMarkerSet.empty();
+  g_rhe.hasH2MarkerSet = !g_rhe.h2MarkerSet.empty();
+  // regenerate the SAME probes from the seed (independent of chunk)
+  std::mt19937 gen(g_rhe.seed);
+  std::uniform_int_distribution<int> coin(0,1);
+  g_rhe.probes.set_size(n, g_rhe.B);
+  for(arma::uword r = 0; r < n; r++)
+    for(int b = 0; b < g_rhe.B; b++)
+      g_rhe.probes(r,b) = coin(gen) ? 1.0 : -1.0;
+  int G = (g_rhe.G > 0) ? g_rhe.G : 1;
+  g_rhe.G = G; g_rhe.markerCounter = 0;
+  // ---- build the component descriptor list from the options ----
+  // rg part: default (pairSpec empty) = A (joint all-K: K diagonals + all-pairs cross,
+  // keep=allHave). If --rg_pairs given = coherent per-pair on M_ab (3 comps/pair).
+  typedef RHEState::Comp Comp;
+  std::vector<Comp>& C = g_rhe.comps; C.clear();
+  bool pairsMode = !( [&]{ std::string s=g_rhe.pairSpec;
+        while(!s.empty()&&(s.front()==' '))s.erase(s.begin());
+        return s.empty(); }() );
+  if(!pairsMode){
+    g_rhe.pairList.clear();
+    for(int a=0;a<K;a++) C.push_back({a,a,a,a,0,-1,true});          // A diagonals
+    int pid=0;
+    for(int a=0;a<K;a++) for(int b=a+1;b<K;b++,pid++)
+      C.push_back({a,b,a,b,1,pid,true});                            // A cross
+    // (pairList unused in A mode, but record all pairs for output labeling)
+    for(int a=0;a<K;a++) for(int b=a+1;b<K;b++) g_rhe.pairList.push_back({a,b});
+  }else{
+    g_rhe.pairList = rhe_parse_pairs(g_rhe.pairSpec, K);
+    for(size_t p=0;p<g_rhe.pairList.size();p++){
+      int a=g_rhe.pairList[p].first, b=g_rhe.pairList[p].second;
+      C.push_back({a,a,a,b,3,(int)p,false});   // pair a-diagonal on M_ab
+      C.push_back({b,b,a,b,3,(int)p,false});   // pair b-diagonal on M_ab
+      C.push_back({a,b,a,b,4,(int)p,false});   // pair cross on M_ab
+    }
+  }
+  // h2 part (optional, additive): per-ancestry single-GRM diagonal on M_a.
+  if(g_rhe.perAncestryH2)
+    for(int a=0;a<K;a++) C.push_back({a,a,a,a,2,-1,false});
+  int ncomp = (int)C.size();
+  g_rhe.ncomp = ncomp;
+  // Non-sparse (diagonal Sigma^-1) path: Kr = D % Ar exactly, so don't store Kr.
+  g_rhe.storeKr = !ptr_gSAIGEobj->isNonSparseDiag_for_rhe();
+  if(!g_rhe.storeKr) g_rhe.sigmaInvDiag = ptr_gSAIGEobj->getRHEsigmaInvDiag();
+  g_rhe.Ar.assign(G, std::vector<arma::fmat>(ncomp, arma::zeros<arma::fmat>(n, g_rhe.B)));
+  if(g_rhe.storeKr)
+    g_rhe.Kr.assign(G, std::vector<arma::fmat>(ncomp, arma::zeros<arma::fmat>(n, g_rhe.B)));
+  else
+    g_rhe.Kr.clear();
+  g_rhe.compScoreSum.assign(G, arma::zeros<arma::vec>(ncomp));
+  g_rhe.compVar.assign(G, arma::zeros<arma::vec>(ncomp));
+  g_rhe.Mcomp.assign(G, arma::zeros<arma::vec>(ncomp));
+  g_rhe.Mblk.assign(G, 0);
+  g_rhe.bufGt.assign(K, arma::vec()); g_rhe.bufP2.assign(K, arma::vec());
+  g_rhe.bufScore.assign(K, 0.0); g_rhe.bufHas.assign(K, 0);
+  // PCGC for binary: cache the linear/PCGC phenotype residual once. Auto-enabled
+  // for binary traits (GLMM observed residual gives wrong-signed ancestry scores).
+  g_rhe.pcgc = (ptr_gSAIGEobj->m_traitType_for_rhe() == "binary");
+  g_rhe.isBinary = g_rhe.pcgc;
+  g_rhe.caseProp = g_rhe.isBinary ? ptr_gSAIGEobj->m_caseProp_for_rhe() : 0.0;
+  if(g_rhe.pcgc){
+    g_rhe.pcgc_res = ptr_gSAIGEobj->getPCGCphenoResidual();
+    std::cout << "[RHE] binary trait (case prop " << g_rhe.caseProp
+              << "): using PCGC linear phenotype residual for rg.\n";
+  }
+  std::cout << "[RHE] mode=" << (pairsMode ? "per-pair (coherent, M_ab)" : "joint all-K (A)")
+            << "  pairs=" << g_rhe.pairList.size()
+            << "  perAncestryH2=" << (g_rhe.perAncestryH2 ? "yes" : "no")
+            << "  components=" << ncomp
+            << "  rgMarkerSubset=" << (g_rhe.hasRgMarkerSet ? std::to_string(g_rhe.rgMarkerSet.size()) : std::string("all"))
+            << "  h2MarkerSubset=" << (g_rhe.hasH2MarkerSet ? std::to_string(g_rhe.h2MarkerSet.size()) : std::string("all"))
+            << "\n";
+  g_rhe.inited = true;
+}
+
+static void rhe_marker_begin(){
+  if(!g_rhe.on || !g_rhe.inited) return;
+  std::fill(g_rhe.bufHas.begin(), g_rhe.bufHas.end(), 0);
+}
+
+// per-ancestry: BUFFER only (gt=gtilde, p2=Sigma^-1 gtilde, score=Tstat).
+// Actual accumulation is flushed atomically per marker in rhe_marker_end, so a
+// marker that is skipped (continue) before completing contributes nothing.
+static void rhe_accumulate_anc(int a, const arma::vec& gt, const arma::vec& p2, double score){
+  if(!g_rhe.on || !g_rhe.inited || a >= g_rhe.K) return;
+  g_rhe.bufGt[a] = gt; g_rhe.bufP2[a] = p2; g_rhe.bufScore[a] = score; g_rhe.bufHas[a] = 1;
+}
+
+// end of marker: flush buffered ancestries into accumulators atomically.
+static void rhe_marker_end(){
+  if(!g_rhe.on || !g_rhe.inited) return;
+  bool allHave = true;
+  for(int a = 0; a < g_rhe.K; a++) if(!g_rhe.bufHas[a]) allHave = false;
+  // a marker is USED if any descriptor's keep rule is satisfiable; cheap proxy:
+  // at least one ancestry passed (descriptors check their own keep below).
+  bool anyPass = false;
+  for(int a = 0; a < g_rhe.K; a++) if(g_rhe.bufHas[a]) anyPass = true;
+  if(!anyPass) return;
+  // assign this marker to a jackknife block (round-robin over G blocks).
+  int bk = (int)(g_rhe.markerCounter % (uint64_t)g_rhe.G);
+  g_rhe.markerCounter += 1;
+  std::vector<arma::fmat>& ArB = g_rhe.Ar[bk];
+  const bool sk = g_rhe.storeKr;
+  std::vector<arma::fmat>* KrB = sk ? &g_rhe.Kr[bk] : nullptr;
+  // cache per-ancestry float gtilde and probe-scalar once (reused across the
+  // descriptors that involve that ancestry: A diag/cross, h2 diag, pair triples).
+  std::vector<arma::fvec> gtf(g_rhe.K), p2f(g_rhe.K);
+  std::vector<arma::frowvec> sAf(g_rhe.K);
+  for(int a = 0; a < g_rhe.K; a++){
+    if(!g_rhe.bufHas[a]) continue;
+    const arma::vec& gt = g_rhe.bufGt[a];
+    gtf[a] = arma::conv_to<arma::fvec>::from(gt);
+    sAf[a] = arma::conv_to<arma::frowvec>::from(gt.t() * g_rhe.probes);
+    if(sk) p2f[a] = arma::conv_to<arma::fvec>::from(g_rhe.bufP2[a]);
+  }
+  bool any = false;
+  for(int c = 0; c < g_rhe.ncomp; c++){
+    const RHEState::Comp& D = g_rhe.comps[c];
+    // marker-subset gate by estimand: h2 components (kind 2) honor the h2 set;
+    // all rg components (kind 0/1/3/4) honor the rg set. Empty set => keep all.
+    bool subsetKeep = (D.kind == 2) ? g_rhe.curH2Keep : g_rhe.curRgKeep;
+    if(!subsetKeep) continue;
+    // keep rule: allK => every ancestry must pass; else the descriptor's kA,kB must.
+    bool keep = D.allK ? allHave : (g_rhe.bufHas[D.kA] && g_rhe.bufHas[D.kB]);
+    if(!keep) continue;
+    any = true;
+    int a = D.gA, b = D.gB;
+    if(a == b){                                  // DIAGONAL component K_a
+      ArB[c] += gtf[a] * sAf[a];
+      if(sk) (*KrB)[c] += p2f[a] * sAf[a];
+      g_rhe.compScoreSum[bk](c) += g_rhe.bufScore[a] * g_rhe.bufScore[a];
+      g_rhe.compVar[bk](c) += arma::dot(g_rhe.bufGt[a], g_rhe.bufP2[a]);
+    }else{                                       // CROSS component K_ab
+      ArB[c] += gtf[a] * sAf[b] + gtf[b] * sAf[a];
+      if(sk) (*KrB)[c] += p2f[a] * sAf[b] + p2f[b] * sAf[a];
+      g_rhe.compScoreSum[bk](c) += g_rhe.bufScore[a] * g_rhe.bufScore[b];
+      g_rhe.compVar[bk](c) += arma::dot(g_rhe.bufGt[a], g_rhe.bufP2[b]);
+    }
+    g_rhe.Mcomp[bk](c) += 1.0;
+  }
+  if(any) g_rhe.Mblk[bk] += 1;
+}
+
+static void rhe_finalize(const std::string& outprefix){
+  if(!g_rhe.on || !g_rhe.inited) return;
+  int32_t n = (int32_t)g_rhe.n, B = (int32_t)g_rhe.B, K = (int32_t)g_rhe.K;
+  int32_t seed = (int32_t)g_rhe.seed;
+  int32_t ncomp = g_rhe.ncomp;
+  int32_t P = (int32_t)g_rhe.pairList.size();
+  int32_t isBin = g_rhe.isBinary ? 1 : 0; double caseProp = g_rhe.caseProp;
+  int32_t storeKr = g_rhe.storeKr ? 1 : 0;   // 0 -> Kr reconstructed in R as D % Ar
+  int32_t perH2 = g_rhe.perAncestryH2 ? 1 : 0;
+  // length-n diagonal D (float32) for reconstructing Kr on the non-sparse path.
+  arma::fvec Dfloat;
+  if(!g_rhe.storeKr) Dfloat = arma::conv_to<arma::fvec>::from(g_rhe.sigmaInvDiag);
+  // null-model constants for the residual (sigma2_e) component: {trSigmaInv, res·res}.
+  arma::vec rheC = ptr_gSAIGEobj->getRHEnullConstants(g_rhe.B, g_rhe.seed);
+  double trSigmaInv = rheC(0), resDotRes = rheC(1);
+  if(g_rhe.pcgc) resDotRes = arma::dot(g_rhe.pcgc_res, g_rhe.pcgc_res);
+  uint64_t Mtot = 0;
+  for(int bk = 0; bk < g_rhe.G; bk++) Mtot += g_rhe.Mblk[bk];
+  // per-component metadata (gA,gB,kind,pairId) so R can dispatch h2 vs rg solves.
+  std::vector<int32_t> meta; meta.reserve(ncomp*4);
+  for(int c = 0; c < ncomp; c++){
+    const RHEState::Comp& D = g_rhe.comps[c];
+    meta.push_back(D.gA); meta.push_back(D.gB); meta.push_back(D.kind); meta.push_back(D.pairId);
+  }
+  // pair list (gA,gB per requested pair) for output labeling.
+  std::vector<int32_t> pmeta; pmeta.reserve(P*2);
+  for(int p = 0; p < P; p++){ pmeta.push_back(g_rhe.pairList[p].first); pmeta.push_back(g_rhe.pairList[p].second); }
+  for(int bk = 0; bk < g_rhe.G; bk++){
+    std::string path = (g_rhe.G == 1)
+        ? outprefix + ".rg_partial.bin"
+        : outprefix + ".block" + std::to_string(bk) + ".rg_partial.bin";
+    FILE* fp = std::fopen(path.c_str(), "wb");
+    if(!fp){ std::cerr << "[RHE] cannot open " << path << " for writing\n"; return; }
+    double M = (double)g_rhe.Mblk[bk];
+    // RHEPART4: descriptor-driven components (h2-on-M_a + coherent per-pair rg).
+    std::fwrite("RHEPART4", 1, 8, fp);
+    std::fwrite(&n, sizeof(int32_t), 1, fp);
+    std::fwrite(&B, sizeof(int32_t), 1, fp);
+    std::fwrite(&K, sizeof(int32_t), 1, fp);
+    std::fwrite(&seed, sizeof(int32_t), 1, fp);
+    std::fwrite(&ncomp, sizeof(int32_t), 1, fp);
+    std::fwrite(&P, sizeof(int32_t), 1, fp);
+    std::fwrite(&isBin, sizeof(int32_t), 1, fp);
+    std::fwrite(&storeKr, sizeof(int32_t), 1, fp);
+    std::fwrite(&perH2, sizeof(int32_t), 1, fp);
+    std::fwrite(&M, sizeof(double), 1, fp);
+    std::fwrite(&caseProp, sizeof(double), 1, fp);
+    if(ncomp>0) std::fwrite(meta.data(), sizeof(int32_t), meta.size(), fp);   // 4*ncomp ints
+    if(P>0)     std::fwrite(pmeta.data(), sizeof(int32_t), pmeta.size(), fp);  // 2*P ints
+    std::fwrite(g_rhe.compScoreSum[bk].memptr(), sizeof(double), ncomp, fp);
+    std::fwrite(g_rhe.compVar[bk].memptr(), sizeof(double), ncomp, fp);
+    std::fwrite(g_rhe.Mcomp[bk].memptr(), sizeof(double), ncomp, fp);
+    std::fwrite(&trSigmaInv, sizeof(double), 1, fp);
+    std::fwrite(&resDotRes, sizeof(double), 1, fp);
+    if(!g_rhe.storeKr) std::fwrite(Dfloat.memptr(), sizeof(float), (size_t)g_rhe.n, fp);
+    for(int c = 0; c < ncomp; c++) std::fwrite(g_rhe.Ar[bk][c].memptr(), sizeof(float), (size_t)g_rhe.n*g_rhe.B, fp);
+    if(g_rhe.storeKr)
+      for(int c = 0; c < ncomp; c++) std::fwrite(g_rhe.Kr[bk][c].memptr(), sizeof(float), (size_t)g_rhe.n*g_rhe.B, fp);
+    std::fclose(fp);
+  }
+  std::cout << "[RHE] wrote " << g_rhe.G << " partial accumulator file(s) to "
+            << outprefix << ".*rg_partial.bin (n=" << n << " B=" << B << " K=" << K
+            << " comps=" << ncomp << " M=" << Mtot << " jackknifeBlocks=" << g_rhe.G << ")\n";
+}
+// =================== end RHE cross-ancestry rg accumulator ===================
 
 
 arma::vec g_r_corr;
@@ -255,12 +588,35 @@ void setAssocTest_GlobalVarsInCPP_X_PARregion_mat(arma::umat & t_X_PARregion_mat
 // [[Rcpp::export]]
 void setMarker_GlobalVarsInCPP(
 			       bool t_isOutputMoreDetails,
-			       int t_marker_chunksize
+			       int t_marker_chunksize,
+			       bool t_isOutputCrossAncCov
 			       )
 
 {
   g_isOutputMoreDetails = t_isOutputMoreDetails;
   g_marker_chunksize = t_marker_chunksize;
+  g_isOutputCrossAncCov = t_isOutputCrossAncCov;
+}
+
+// [[Rcpp::export]]
+void setRHE_GlobalVarsInCPP(bool t_estimate_cross_anc_rg,
+                            int t_rg_nProbes,
+                            int t_rg_seed,
+                            int t_rg_nJackknifeBlocks,
+                            std::string t_rg_pairs,
+                            bool t_rg_perAncestryH2,
+                            std::string t_rg_markerFile,
+                            std::string t_h2_markerFile)
+{
+  g_rhe.on = t_estimate_cross_anc_rg;
+  g_rhe.B = (t_rg_nProbes > 0) ? t_rg_nProbes : 30;
+  g_rhe.seed = (unsigned int) t_rg_seed;
+  g_rhe.G = (t_rg_nJackknifeBlocks > 0) ? t_rg_nJackknifeBlocks : 1;
+  g_rhe.pairSpec = t_rg_pairs;                 // "" => joint all-K (A); else per-pair
+  g_rhe.perAncestryH2 = t_rg_perAncestryH2;    // also estimate h2 on each anc's own markers
+  g_rhe.rgMarkerFile = t_rg_markerFile;        // "" => no restriction (all tested markers)
+  g_rhe.h2MarkerFile = t_h2_markerFile;
+  g_rhe.inited = false;   // (re)allocate lazily once n,K known in the marker loop
 }
 
 
@@ -4894,8 +5250,18 @@ void mainMarkerAdmixedInCPP(
 
   q = t_genoIndex.size();
   
-  std::vector<std::string> pvalHet_Vec(q, "NA");  
-  std::vector<std::string> pvalHom_Vec(q, "NA");  
+  std::vector<std::string> pvalHet_Vec(q, "NA");
+  // cross-ancestry score cov off-diagonals (flattened a<b); default filler has the
+  // fixed C(t_NumberofANC,2) tab-separated NA fields so columns stay aligned.
+  std::string crossAncCovNA;
+  for(int a = 0; a < t_NumberofANC; a++){
+    for(int b = a + 1; b < t_NumberofANC; b++){
+      crossAncCovNA += (crossAncCovNA.empty() ? "" : "\t");
+      crossAncCovNA += "NA";
+    }
+  }
+  std::vector<std::string> crossAncCov_Vec(q, crossAncCovNA);
+  std::vector<std::string> pvalHom_Vec(q, "NA");
   std::vector<std::string> pvalAdmixed_Vec(q, "NA");  
   std::vector<std::string> pvalHet_cVec(q, "NA");  
   std::vector<std::string> pvalHom_cVec(q, "NA");  
@@ -4914,7 +5280,8 @@ void mainMarkerAdmixedInCPP(
 
   for(int i = 0; i < q; i++){
     arma::ivec includeTestANCvec(t_NumberofANC+1, arma::fill::zeros);
-     
+    rhe_marker_begin();   // RHE: reset per-marker ancestry buffer
+
     if((i+1) % g_marker_chunksize == 0){
       std::cout << "Completed " << (i+1) << "/" << q << " markers in the chunk." << std::endl;
     }
@@ -5139,6 +5506,42 @@ void mainMarkerAdmixedInCPP(
    t_GVecHom = t_GVecHom + t_GVec;
    altCounts = arma::accu(t_GVec);
    altFreq = altCounts/double(nanc);
+
+   // RHE: capture raw ancestry-a dosage X_a and per-individual local-ancestry
+   // haplotype count n_a, to build the EXPOSURE-CENTERED radmix component
+   // Z_a = X_a - n_a * p_a at the accumulation hook below. p_a = altFreq (ALT
+   // freq per ancestry-a haplotype). n_a comes from the "ANC"+j field (random
+   // access by gIndex; does not advance the iterator).
+   // RHE per-estimand marker-subset membership (computed once per marker, j==0).
+   // A marker is kept for rg / h2 if its set is empty (no restriction) or its
+   // variant id OR "chr:pos" is present. Same variant across all ancestry fields.
+   if(g_rhe.on && j == 0){
+     if(g_rhe.hasRgMarkerSet || g_rhe.hasH2MarkerSet){
+       std::string chrpos = chr + ":" + std::to_string(pd);
+       g_rhe.curRgKeep = !g_rhe.hasRgMarkerSet ||
+         g_rhe.rgMarkerSet.count(marker) || g_rhe.rgMarkerSet.count(chrpos);
+       g_rhe.curH2Keep = !g_rhe.hasH2MarkerSet ||
+         g_rhe.h2MarkerSet.count(marker) || g_rhe.h2MarkerSet.count(chrpos);
+     }else{
+       g_rhe.curRgKeep = true; g_rhe.curH2Keep = true;
+     }
+   }
+   if(g_rhe.on && j < t_NumberofANC){
+     g_rhe_Xa = t_GVec;                 // raw ancestry-a dosage (per individual)
+     g_rhe_pa = altFreq;                // ancestry-a ALT frequency per haplotype
+     g_rhe_nanc_vec.set_size(t_GVec.n_elem); g_rhe_nanc_vec.zeros();
+     std::vector<uint> idxNZ_anc, idxMiss_anc;
+     std::string ancField = "ANC" + std::to_string(j+1);
+     double aF = 0, aC = 0, mR = 0, iI = 0;
+     std::string r_ = ref, a_ = alt, m_ = marker, c_ = chr;
+     uint32_t pd_ = pd;
+     uint64_t gIdxP = gIndex_prev, gIdx = gIndex;
+     bool outMiss_anc = false, onlyNZ_anc = false;
+     bool okAnc = Unified_getOneMarker_Admixed(t_genoType, gIdxP, gIdx,
+            r_, a_, m_, pd_, c_, aF, aC, mR, iI, outMiss_anc, idxMiss_anc, onlyNZ_anc,
+            idxNZ_anc, g_rhe_nanc_vec, t_isImputation, ancField);
+     g_rhe_has_anc = okAnc;
+   }
    if(!isReadMarker){
       //std::cout << "isReadMarker " << isReadMarker << std::endl;
       g_markerTestEnd = true;
@@ -5345,6 +5748,52 @@ void mainMarkerAdmixedInCPP(
    Scorevec(j) = Tstat;
    PvalvecallAnc(j) = pval_num;
 
+   if(g_rhe.on && g_rhe_has_anc){
+     // RHE accumulation (radmix). Build the EXPOSURE-CENTERED ancestry component
+     //   Z_a = X_a - n_a * p_a
+     // (X_a = raw ancestry-a dosage, n_a = local-ancestry-a haplotype count,
+     // p_a = ancestry-a ALT freq). Covariate-adjusting SAIGE's gtilde (mean-
+     // centered) makes the ancestry GRMs collinear (~0.99) -> singular; the
+     // exposure centering is what decorrelates them (~0.16, like radmix).
+     // Then covariate-adjust + Sigma^-1 via getGtildeAndP2 (variance-ratio path),
+     // and standardize by sqrt(var2_z) so the component norms are comparable.
+     rhe_init_if_needed(g_rhe_Xa.n_elem, t_NumberofANC);
+     // exposure-centered + AF-STANDARDIZED radmix component:
+     //   Z_a = (X_a - n_a p_a) / sqrt(2 p_a (1-p_a))
+     // AF-standardization (not per-marker norm) keeps tr(G_a) ~ N, consistent
+     // with the residual-component constants tr(Sigma^-1) and res·res so the
+     // 4x4 HE solve (sigma2_e) is correctly scaled.
+     double pa = g_rhe_pa;
+     // per-ancestry MAF filter (match radmix / the prototype's QC): skip markers
+     // where ancestry a is too rare, so low-information markers don't dilute the
+     // GRM traces. 0.01 MAF floor on the ancestry-specific frequency.
+     if(pa > 0.01 && pa < 0.99){
+       double afsd = std::sqrt(2.0 * pa * (1.0 - pa));
+       arma::vec Za = (g_rhe_Xa - pa * g_rhe_nanc_vec) / afsd;
+       arma::vec gt_z, p2_z;
+       ptr_gSAIGEobj->getGtildeAndP2(Za, gt_z, p2_z);
+       // Score for the HE q-vector.
+       double score_z;
+       if(g_rhe.pcgc){
+         // binary: use the PCGC linear phenotype residual (the GLMM observed
+         // residual Y-mu gives wrong-signed ancestry score cross-products). No
+         // tau/vr scaling: the PCGC residual is on the linear phenotype scale and
+         // the PCGC c^2 factor cancels in the rg ratio.
+         score_z = arma::dot(gt_z, g_rhe.pcgc_res);
+       }else{
+         // quantitative: score must be on the SAME metric as S (var2 = g̃'Σ⁻¹g̃).
+         // SAIGE's calibrated var1 = vr*var2, so g̃'res/tau carries a factor of vr
+         // relative to S; divide by vr for q/S consistency.
+         double vr = ptr_gSAIGEobj->m_varRatioVal;
+         score_z = arma::dot(gt_z, ptr_gSAIGEobj->m_res_for_rhe())
+                   / ptr_gSAIGEobj->m_tau_for_rhe();
+         if(vr > 0) score_z /= vr;
+       }
+       rhe_accumulate_anc(j, gt_z, p2_z, score_z);
+     }
+     g_rhe_has_anc = false;   // consumed
+   }
+
    if(isconditiononHaplo){
 	G1tilde_P_G2tilde_Mat.row(j) = G1tilde_P_G2tilde_Vec;
    	Scorevec_c(j) = Tstat_c;
@@ -5451,6 +5900,25 @@ void mainMarkerAdmixedInCPP(
 	pvalHet_Vec.at(i) = P_het_admixed_str;
 	pvalHom_Vec.at(i) = pval;
 	pvalAdmixed_Vec.at(i) = P_cct_admixed_str;
+	if(g_isOutputCrossAncCov){
+		// flatten upper-triangle off-diagonals of the K x K ancestry score
+		// covariance VarMat: covT_anc{a+1}_anc{b+1} for a<b. Always emit
+		// C(t_NumberofANC,2) tab-separated values (NA if out of range).
+		std::ostringstream covoss;
+		bool covfirst = true;
+		for(int a = 0; a < t_NumberofANC; a++){
+			for(int b = a + 1; b < t_NumberofANC; b++){
+				if(!covfirst){ covoss << "\t"; }
+				covfirst = false;
+				if((arma::uword)a < VarMat.n_rows && (arma::uword)b < VarMat.n_cols){
+					covoss << VarMat(a, b);
+				}else{
+					covoss << "NA";
+				}
+			}
+		}
+		crossAncCov_Vec.at(i) = covoss.str();
+	}
 
 
 	if(isconditiononHaplo){
@@ -5526,6 +5994,7 @@ void mainMarkerAdmixedInCPP(
 
 
     }//for(int j = 0; j < t_NumberofANC; j++)
+    rhe_marker_end();   // RHE: flush this marker's buffered ancestries atomically
     if(t_genoType == "vcf"){
       ptr_gVCFobj->move_forward_iterator(1);
     }
@@ -5539,6 +6008,10 @@ void mainMarkerAdmixedInCPP(
 
   exit_loops:
   	std::cout << "the end of file" << std::endl;
+  if(g_rhe.on){
+    // RHE: write this chunk's partial accumulators for the R combine step.
+    rhe_finalize(g_outputFilePrefixSingle);
+  }
   //output
   double __tractor_output_new_start = tractor_hybrid_now_seconds();
   writeOutfile_single_admixed_new(t_isMoreOutput,
@@ -5580,6 +6053,7 @@ void mainMarkerAdmixedInCPP(
   N_ctrl_homVec,
   N_Vec,
   pvalHet_Vec,
+  crossAncCov_Vec,
   pvalHom_Vec,
   pvalAdmixed_Vec,
   pvalHet_cVec,
@@ -5632,6 +6106,7 @@ void writeOutfile_single_admixed_new(bool t_isMoreOutput,
                         std::vector<double>  & N_ctrl_homVec,
                         std::vector<uint32_t> & N_Vec,
   std::vector<std::string> & pvalHet_Vec,
+  std::vector<std::string> & crossAncCov_Vec,
   std::vector<std::string> & pvalHom_Vec,
   std::vector<std::string> & pvalAdmixed_Vec,
   std::vector<std::string> & pvalHet_cVec,
@@ -5736,6 +6211,10 @@ void writeOutfile_single_admixed_new(bool t_isMoreOutput,
  
 	 OutFile_single << "\t";
          OutFile_single << pvalHet_Vec.at(j);
+	 if(g_isOutputCrossAncCov){
+	     OutFile_single << "\t";
+	     OutFile_single << crossAncCov_Vec.at(j);
+	 }
 	 OutFile_single << "\t";
          OutFile_single << pvalHom_Vec.at(j);
 	 OutFile_single << "\t";
@@ -5900,6 +6379,13 @@ bool openOutfile_single_admixed_new(std::string t_traitType, bool t_isImputation
  */
                 OutFile_single << "\t";
                 OutFile_single << "P_het_admixed";
+                if(g_isOutputCrossAncCov){
+                    for(int a = 1; a <= t_NumberofANC; a++){
+                        for(int b = a + 1; b <= t_NumberofANC; b++){
+                            OutFile_single << "\tcovT_anc" << a << "_anc" << b;
+                        }
+                    }
+                }
                 OutFile_single << "\t";
                 OutFile_single << "P_hom_admixed";
                 OutFile_single << "\t";

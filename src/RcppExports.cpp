@@ -143,13 +143,31 @@ BEGIN_RCPP
 END_RCPP
 }
 // setMarker_GlobalVarsInCPP
-void setMarker_GlobalVarsInCPP(bool t_isOutputMoreDetails, int t_marker_chunksize);
-RcppExport SEXP _SAIGE_setMarker_GlobalVarsInCPP(SEXP t_isOutputMoreDetailsSEXP, SEXP t_marker_chunksizeSEXP) {
+void setMarker_GlobalVarsInCPP(bool t_isOutputMoreDetails, int t_marker_chunksize, bool t_isOutputCrossAncCov);
+RcppExport SEXP _SAIGE_setMarker_GlobalVarsInCPP(SEXP t_isOutputMoreDetailsSEXP, SEXP t_marker_chunksizeSEXP, SEXP t_isOutputCrossAncCovSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< bool >::type t_isOutputMoreDetails(t_isOutputMoreDetailsSEXP);
     Rcpp::traits::input_parameter< int >::type t_marker_chunksize(t_marker_chunksizeSEXP);
-    setMarker_GlobalVarsInCPP(t_isOutputMoreDetails, t_marker_chunksize);
+    Rcpp::traits::input_parameter< bool >::type t_isOutputCrossAncCov(t_isOutputCrossAncCovSEXP);
+    setMarker_GlobalVarsInCPP(t_isOutputMoreDetails, t_marker_chunksize, t_isOutputCrossAncCov);
+    return R_NilValue;
+END_RCPP
+}
+// setRHE_GlobalVarsInCPP
+void setRHE_GlobalVarsInCPP(bool t_estimate_cross_anc_rg, int t_rg_nProbes, int t_rg_seed, int t_rg_nJackknifeBlocks, std::string t_rg_pairs, bool t_rg_perAncestryH2, std::string t_rg_markerFile, std::string t_h2_markerFile);
+RcppExport SEXP _SAIGE_setRHE_GlobalVarsInCPP(SEXP t_estimate_cross_anc_rgSEXP, SEXP t_rg_nProbesSEXP, SEXP t_rg_seedSEXP, SEXP t_rg_nJackknifeBlocksSEXP, SEXP t_rg_pairsSEXP, SEXP t_rg_perAncestryH2SEXP, SEXP t_rg_markerFileSEXP, SEXP t_h2_markerFileSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< bool >::type t_estimate_cross_anc_rg(t_estimate_cross_anc_rgSEXP);
+    Rcpp::traits::input_parameter< int >::type t_rg_nProbes(t_rg_nProbesSEXP);
+    Rcpp::traits::input_parameter< int >::type t_rg_seed(t_rg_seedSEXP);
+    Rcpp::traits::input_parameter< int >::type t_rg_nJackknifeBlocks(t_rg_nJackknifeBlocksSEXP);
+    Rcpp::traits::input_parameter< std::string >::type t_rg_pairs(t_rg_pairsSEXP);
+    Rcpp::traits::input_parameter< bool >::type t_rg_perAncestryH2(t_rg_perAncestryH2SEXP);
+    Rcpp::traits::input_parameter< std::string >::type t_rg_markerFile(t_rg_markerFileSEXP);
+    Rcpp::traits::input_parameter< std::string >::type t_h2_markerFile(t_h2_markerFileSEXP);
+    setRHE_GlobalVarsInCPP(t_estimate_cross_anc_rg, t_rg_nProbes, t_rg_seed, t_rg_nJackknifeBlocks, t_rg_pairs, t_rg_perAncestryH2, t_rg_markerFile, t_h2_markerFile);
     return R_NilValue;
 END_RCPP
 }
@@ -3835,7 +3853,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SAIGE_setAssocTest_GlobalVarsInCPP", (DL_FUNC) &_SAIGE_setAssocTest_GlobalVarsInCPP, 11},
     {"_SAIGE_setAssocTest_GlobalVarsInCPP_indexInModel_male", (DL_FUNC) &_SAIGE_setAssocTest_GlobalVarsInCPP_indexInModel_male, 1},
     {"_SAIGE_setAssocTest_GlobalVarsInCPP_X_PARregion_mat", (DL_FUNC) &_SAIGE_setAssocTest_GlobalVarsInCPP_X_PARregion_mat, 1},
-    {"_SAIGE_setMarker_GlobalVarsInCPP", (DL_FUNC) &_SAIGE_setMarker_GlobalVarsInCPP, 2},
+    {"_SAIGE_setMarker_GlobalVarsInCPP", (DL_FUNC) &_SAIGE_setMarker_GlobalVarsInCPP, 3},
+    {"_SAIGE_setRHE_GlobalVarsInCPP", (DL_FUNC) &_SAIGE_setRHE_GlobalVarsInCPP, 8},
     {"_SAIGE_setRegion_GlobalVarsInCPP", (DL_FUNC) &_SAIGE_setRegion_GlobalVarsInCPP, 5},
     {"_SAIGE_mainMarkerInCPP", (DL_FUNC) &_SAIGE_mainMarkerInCPP, 7},
     {"_SAIGE_Unified_getOneMarker", (DL_FUNC) &_SAIGE_Unified_getOneMarker, 18},

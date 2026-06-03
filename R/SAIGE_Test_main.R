@@ -101,6 +101,15 @@ SPAGMMATtest = function(bgenFile = "",
                  dosage_zerod_cutoff = 0.2,
                  dosage_zerod_MAC_cutoff = 10,
                  is_output_moreDetails = FALSE, #new
+                 is_output_cross_anc_cov = FALSE, #admixed: output cross-ancestry score covariance (covT_anc{a}_anc{b}) for rho_w
+                 estimate_cross_anc_rg = FALSE, #admixed: accumulate RHE partials for cross-ancestry rg (writes <out>.rg_partial.bin)
+                 rg_nProbes = 30, #RHE number of random probes
+                 rg_seed = 1, #RHE probe seed; MUST be identical across all chunks/chromosomes
+                 rg_nJackknifeBlocks = 1, #RHE: split this run's markers into this many jackknife blocks (one partial file per block) so step3 yields an SE from a single job; 1 = original single-file behavior
+                 rg_pairs = "", #RHE: comma-list of ancestry pairs e.g. "1-2,1-3" (1-indexed) to estimate rg coherently per pair on markers shared by both. Empty = joint all-K (default A)
+                 rg_perAncestryH2 = FALSE, #RHE: also estimate each ancestry's h2 on its own markers (proper per-ancestry heritability)
+                 rg_markerFile = "", #RHE: restrict the rg components to these markers (one variant id or chr:pos per line); rg tolerates LD-pruning, e.g. ~200k. Empty = all tested markers
+                 h2_markerFile = "", #RHE: restrict the per-ancestry h2 components to these markers (e.g. HapMap3 ~1M; h2 is tagging-limited). Empty = all tested markers
                  X_PARregion="60001-2699520,154931044-155270560",
                  is_rewrite_XnonPAR_forMales=FALSE,
                  sampleFile_male="",
@@ -186,7 +195,19 @@ SPAGMMATtest = function(bgenFile = "",
 
       setMarker_GlobalVarsInCPP(
 			    is_output_moreDetails,
-			    markers_per_chunk
+			    markers_per_chunk,
+			    is_output_cross_anc_cov
+                            )
+
+      setRHE_GlobalVarsInCPP(
+			    estimate_cross_anc_rg,
+			    rg_nProbes,
+			    rg_seed,
+			    rg_nJackknifeBlocks,
+			    rg_pairs,
+			    rg_perAncestryH2,
+			    rg_markerFile,
+			    h2_markerFile
                             )
 
     }else{

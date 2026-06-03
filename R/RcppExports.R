@@ -41,8 +41,12 @@ setAssocTest_GlobalVarsInCPP_X_PARregion_mat <- function(t_X_PARregion_mat) {
     invisible(.Call('_SAIGE_setAssocTest_GlobalVarsInCPP_X_PARregion_mat', PACKAGE = 'SAIGE', t_X_PARregion_mat))
 }
 
-setMarker_GlobalVarsInCPP <- function(t_isOutputMoreDetails, t_marker_chunksize) {
-    invisible(.Call('_SAIGE_setMarker_GlobalVarsInCPP', PACKAGE = 'SAIGE', t_isOutputMoreDetails, t_marker_chunksize))
+setMarker_GlobalVarsInCPP <- function(t_isOutputMoreDetails, t_marker_chunksize, t_isOutputCrossAncCov) {
+    invisible(.Call('_SAIGE_setMarker_GlobalVarsInCPP', PACKAGE = 'SAIGE', t_isOutputMoreDetails, t_marker_chunksize, t_isOutputCrossAncCov))
+}
+
+setRHE_GlobalVarsInCPP <- function(t_estimate_cross_anc_rg, t_rg_nProbes, t_rg_seed, t_rg_nJackknifeBlocks, t_rg_pairs, t_rg_perAncestryH2, t_rg_markerFile, t_h2_markerFile) {
+    invisible(.Call('_SAIGE_setRHE_GlobalVarsInCPP', PACKAGE = 'SAIGE', t_estimate_cross_anc_rg, t_rg_nProbes, t_rg_seed, t_rg_nJackknifeBlocks, t_rg_pairs, t_rg_perAncestryH2, t_rg_markerFile, t_h2_markerFile))
 }
 
 setRegion_GlobalVarsInCPP <- function(t_max_maf_region, t_max_markers_region, t_MACCutoff_to_CollapseUltraRare, t_min_gourpmac_for_burdenonly, t_r_corr) {

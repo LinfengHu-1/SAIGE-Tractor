@@ -5,10 +5,29 @@ platforms = ["linux-64", "osx-64"]
 version = "0.1.0"
 
 [tasks]
+install-github-deps = "Rscript -e 'install.packages(\"lintools\", repos=\"https://cran.r-project.org\")'"
+# Build the bundled plink2 static archive that src/Makevars links via `-L.. -l:plink2_includes.a`.
+# Use $CXX (not $CC) and `ar` to make a real static archive: ar only bundles the
+# objects, so the C++ runtime/ABI symbols are resolved later when SAIGE.so is linked.
+# Output name (plink2_includes.a) and location (package root) must match Makevars.
+install-plink2 = "curl -L https://github.com/chrchang/plink-ng/archive/refs/tags/v2.0.0-a.6.16.tar.gz | tar -zx && rm -rf plink-ng && mv plink-ng-2.0.0-a.6.16 plink-ng && $CXX -std=c++14 -fPIC -O3 -I.pixi/envs/default/include -c plink-ng/2.0/include/*.cc && ar rcs plink2_includes.a *.o && rm -f *.o"
+# One-shot build: ensure CRAN dep + plink2 archive, then install the package.
+# Task cwd is this manifest dir (SAIGE-Tractor), so `.` is the package and the
+# library lands at the repo root: SAIGETractor/install_SAIGETractor
+#install = { cmd = "R CMD INSTALL . --library=../install_SAIGETractor", depends-on = ["install-github-deps", "install-plink2"] }
+# Build the tractor_hybrid converter (needs htslib + pkg-config in deps).
+# Force -std=c++17 because the env exports CXXFLAGS, which would otherwise shadow
+# the Makefile's `CXXFLAGS ?=` default and drop the C++17 flag this code needs.
+build-converter = "make -C tools/tractor_hybrid CXX=$CXX CXXFLAGS='-O3 -std=c++17 -Wall'"
+
+[activation]
+scripts = ["activate.sh"]
 
 [dependencies]
 boost-cpp = "*"
 cget = "*"
+htslib = "*"
+pkg-config = "*"
 openblas = "*"
 r = "*"
 r-bh = "*"
@@ -31,3 +50,12 @@ savvy = "*"
 superlu = "*"
 zlib = "*"
 zstd = "*"
+
+[target.linux-64.dependencies]
+gxx_linux-64 = "*"
+
+[target.osx-arm64.dependencies]
+clangxx_osx-arm64 = "*"
+
+[target.osx-64.dependencies]
+clangxx_osx-64 = "*"

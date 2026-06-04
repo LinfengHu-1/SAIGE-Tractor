@@ -6611,7 +6611,9 @@ if(nanc > 0){
      TstatVec(i) = Tstat;
      //pVec(i) = std::stod(pval);
      pVec.at(i) = pval;
-     pdoubleVec(i) = std::stod(pval);
+     // safe conversion: a very strong signal underflows the p-value string
+     // (e.g. "1e-320"), which std::stod throws out_of_range on; treat as 0.
+     pdoubleVec(i) = convertStringtoDoublePval(pval);
      }//if(nanc > 0){
 
    //}//if(i < q){ //do not need to test the last ancestry

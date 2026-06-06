@@ -9,6 +9,21 @@ ancestries and to binary traits, and scalable to biobank N).
 > **Scope:** this workflow is for **unrelated samples**. Remove related individuals first
 > (Step 0). For related samples, relatedness is not yet handled in this estimator.
 
+> ### ⚠️ Estimate rg/h2 SEPARATELY from the GWAS, unless your cohort is already unrelated
+>
+> The GWAS association test runs on the **full cohort** -- the mixed model absorbs
+> relatedness there. But the rg/h2 (RHE) estimator requires **unrelated** samples and does
+> **not** model relatedness. So:
+>
+> - **If your cohort contains related individuals:** run the GWAS as usual on the full
+>   cohort, and run rg/h2 as a **separate** analysis on the unrelated subset (Step 0 ->
+>   `step1_fitNULL_noGRM.R` or `step2_rgRHEonly.R --sampleFile`). Do **not** turn on
+>   `--estimate_cross_anc_rg` in a GWAS run that includes relatives -- the RHE would
+>   accumulate over related samples and be biased. (Step 2 warns if you do this.)
+> - **Only if your dataset is already entirely unrelated** may you run them together
+>   (Workflow A with `--estimate_cross_anc_rg=TRUE`), since the GWAS samples == the rg/h2
+>   samples.
+
 ---
 
 ## Inputs
@@ -67,7 +82,9 @@ Use the resulting `*.in.id` list as `--sampleFile` below.
 ## Workflow A — 3 steps (integrated: also produces the per-variant GWAS scan)
 
 Use this when you want the standard admixed association results **and** rg/h2 from one
-genotype pass.
+genotype pass. **Only valid when the whole dataset is unrelated** -- the GWAS and the
+rg/h2 are computed on the same samples. If your cohort has relatives, do not use this for
+rg/h2; run the GWAS on the full cohort and use Workflow B on the unrelated subset instead.
 
 ### Step 1 — null model (GLMM-free, no GRM)
 

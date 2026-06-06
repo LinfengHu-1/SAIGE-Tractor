@@ -258,7 +258,28 @@ SPAGMMATtest = function(bgenFile = "",
     if(subSampleFile == ""){
     	obj.model = ReadModel(GMMATmodelFile, chrom, LOCO, is_Firth_beta) #readInGLMM.R
     }else{
-    	obj.model = ReadModel_subsample(GMMATmodelFile, chrom, LOCO, is_Firth_beta, subSampleFile) #readInGLMM.R	
+    	obj.model = ReadModel_subsample(GMMATmodelFile, chrom, LOCO, is_Firth_beta, subSampleFile) #readInGLMM.R
+    }
+
+    ## Cross-ancestry rg/h2 (RHE) is only valid on UNRELATED samples. The association
+    ## test handles relatedness via the GRM, but the RHE accumulation does NOT -- it
+    ## requires a GLMM-free null model (no GRM; theta_g = 0, e.g. from step1_fitNULL_noGRM.R).
+    ## If --estimate_cross_anc_rg=TRUE but the null model was fit WITH a GRM (related
+    ## samples), warn loudly: estimate rg/h2 separately on the unrelated subset.
+    if(isTRUE(estimate_cross_anc_rg)){
+      .fitWithGRM <- (!is.null(obj.model$useSparseGRMtoFitNULL) && isTRUE(obj.model$useSparseGRMtoFitNULL)) ||
+                     (length(obj.model$theta) >= 2 && is.finite(obj.model$theta[2]) && obj.model$theta[2] > 1e-8)
+      if(.fitWithGRM){
+        cat("##############################################################################\n")
+        cat("WARNING: --estimate_cross_anc_rg=TRUE but the null model was fit WITH a GRM\n")
+        cat("(theta_g > 0 / useSparseGRMtoFitNULL=TRUE), i.e. the cohort contains RELATED\n")
+        cat("samples. The cross-ancestry rg/h2 (RHE) estimator is only valid on UNRELATED\n")
+        cat("samples and will be BIASED here. Estimate rg/h2 SEPARATELY: select an\n")
+        cat("unrelated subset (Step 0) and fit a GLMM-free null with step1_fitNULL_noGRM.R\n")
+        cat("(or run step2_rgRHEonly.R with --sampleFile on the unrelated set). The\n")
+        cat("association results from THIS run (full cohort) remain valid.\n")
+        cat("##############################################################################\n")
+      }
     }
 
 

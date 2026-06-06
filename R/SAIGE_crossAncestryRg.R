@@ -13,13 +13,14 @@
 
 #' @keywords internal
 .read_rg_partial2 <- function(path) {
-  sz <- file.info(path)$size
-  raw <- readBin(path, "raw", n = sz)
-  off <- 8L                                               # skip 8-byte magic
-  rd_i32 <- function(nn = 1L) { v <- readBin(raw[(off+1):(off+4*nn)], "integer", nn, size = 4); off <<- off + 4L*nn; v }
-  rd_dbl <- function(nn) { v <- readBin(raw[(off+1):(off+8*nn)], "double", nn, size = 8); off <<- off + 8L*nn; v }
-  rd_f32 <- function(nn) { v <- readBin(raw[(off+1):(off+4*nn)], "double", nn, size = 4); off <<- off + 4L*nn; v }
-  magic <- rawToChar(raw[1:8])
+  # Stream from a file connection: readBin advances the position itself, so we avoid
+  # loading the whole file as a raw vector and the per-field raw[(off+1):(off+k)] index
+  # slicing (which allocated a large index vector + raw copy per read -- the memory peak).
+  con <- file(path, "rb"); on.exit(close(con))
+  rd_i32 <- function(nn = 1L) readBin(con, "integer", n = nn, size = 4L, endian = "little")
+  rd_dbl <- function(nn) readBin(con, "double", n = nn, size = 8L, endian = "little")
+  rd_f32 <- function(nn) readBin(con, "double", n = nn, size = 4L, endian = "little")  # float32 -> double
+  magic <- rawToChar(readBin(con, "raw", n = 8L))
   if (magic != "RHEPART4") stop("bad RHE partial magic in ", path,
        " (got '", magic, "'; expected RHEPART4 -- re-run step2 with the current build)")
   n <- rd_i32(); B <- rd_i32(); K <- rd_i32(); seed <- rd_i32()
@@ -33,15 +34,20 @@
   compScoreSum <- rd_dbl(ncomp); compVar <- rd_dbl(ncomp); Mcomp <- rd_dbl(ncomp)
   trSigmaInv <- rd_dbl(1); resDotRes <- rd_dbl(1)
   Ddiag <- if (storeKr == 0L) rd_f32(n) else NULL
-  Ar <- vector("list", ncomp); Kr <- vector("list", ncomp)
+  Ar <- vector("list", ncomp)
   for (c in seq_len(ncomp)) Ar[[c]] <- matrix(rd_f32(n * B), n, B)   # column-major float32
+  # Non-sparse (storeKr==0): Kr = Ddiag %*% Ar with Ddiag a per-sample vector identical
+  # across files, so we do NOT materialize Kr here (it doubled the matrix memory). The
+  # solve forms the needed Kr.Ar inner products from Ar + Ddiag on the fly. Sparse path
+  # (storeKr!=0) stores Kr explicitly as before.
+  Kr <- NULL
   if (storeKr != 0L) {
+    Kr <- vector("list", ncomp)
     for (c in seq_len(ncomp)) Kr[[c]] <- matrix(rd_f32(n * B), n, B)
-  } else {
-    for (c in seq_len(ncomp)) Kr[[c]] <- Ar[[c]] * Ddiag    # Kr = D % Ar (non-sparse)
   }
   list(n = n, B = B, K = K, seed = seed, ncomp = ncomp, P = P,
        isBinary = (isBin != 0L), perAncestryH2 = (perH2 != 0L), caseProp = caseProp,
+       storeKr = (storeKr != 0L), Ddiag = Ddiag,
        gA = gA, gB = gB, kind = kind, pairId = pairId, pairA = pairA, pairB = pairB,
        compScoreSum = compScoreSum, compVar = compVar, Mcomp = Mcomp, M = M,
        trSigmaInv = trSigmaInv, resDotRes = resDotRes, Ar = Ar, Kr = Kr)
@@ -53,10 +59,32 @@
 #' q / e-trace scalars (K_ab is the symmetric Z_a Z_b' + Z_b Z_a'); the genetic
 #' block already encodes it via the accumulated Ar/Kr.
 #' @keywords internal
+#' All component-pair Kr.Ar inner products in one BLAS crossprod (G[k,l] = sum(Kr_k * Ar_l)).
+#' Replaces the per-pair, per-solve interpreted sum(Kr_k * Ar_l) (which was ~76% of step3
+#' CPU) with a single (n*B x ncomp)^T (n*B x ncomp) BLAS multiply. Non-sparse: Kr_k = Ar_k *
+#' Ddiag (per-sample weight, recycled over the n*B column-major vec), so G = crossprod(Ar*w, Ar)
+#' (symmetric). Sparse: G = crossprod(Kr, Ar) using the stored Kr.
+#' @keywords internal
+.gram_matrix <- function(acc) {
+  ncomp <- length(acc$Ar)
+  nB <- length(acc$Ar[[1]])
+  Am <- matrix(0, nB, ncomp)
+  for (c in seq_len(ncomp)) Am[, c] <- acc$Ar[[c]]        # column-major vec of each Ar
+  if (is.null(acc$Kr)) {
+    w <- rep(acc$Ddiag, length.out = nB)                  # Ddiag per entry (recycled B times)
+    crossprod(Am * w, Am)
+  } else {
+    Km <- matrix(0, nB, ncomp)
+    for (c in seq_len(ncomp)) Km[, c] <- acc$Kr[[c]]
+    crossprod(Km, Am)
+  }
+}
+
 .he_solve_components <- function(acc, gidx, B) {
   d <- length(gidx) + 1L
   S <- matrix(0, d, d); q <- numeric(d)
   Mc <- acc$Mcomp
+  G <- acc$Gram                                           # precomputed in .solve_all
   for (i in seq_along(gidx)) {
     k <- gidx[i]
     fk <- if (acc$gA[k] != acc$gB[k]) 2 else 1     # cross vs diagonal
@@ -64,8 +92,7 @@
     q[i] <- fk * acc$compScoreSum[k] / Mc[k]               # y' K_k y
     for (j in seq_along(gidx)) {
       l <- gidx[j]
-      S[i, j] <- (sum(acc$Kr[[k]] * acc$Ar[[l]]) + sum(acc$Kr[[l]] * acc$Ar[[k]])) /
-                 (2 * B * Mc[k] * Mc[l])
+      S[i, j] <- (G[k, l] + G[l, k]) / (2 * B * Mc[k] * Mc[l])
     }
   }
   S[d, d] <- acc$trSigmaInv; q[d] <- acc$resDotRes
@@ -136,17 +163,37 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
   .combine <- function(ps) {
     acc <- list(gA = h$gA, gB = h$gB, kind = h$kind, pairId = h$pairId,
                 trSigmaInv = h$trSigmaInv, resDotRes = h$resDotRes,
+                storeKr = h$storeKr, Ddiag = h$Ddiag,   # Ddiag identical across blocks
                 compScoreSum = Reduce(`+`, lapply(ps, `[[`, "compScoreSum")),
                 compVar = Reduce(`+`, lapply(ps, `[[`, "compVar")),
                 Mcomp = Reduce(`+`, lapply(ps, `[[`, "Mcomp")),
                 M = sum(vapply(ps, `[[`, numeric(1), "M")))
     acc$Ar <- lapply(seq_len(ncomp), function(c) Reduce(`+`, lapply(ps, function(p) p$Ar[[c]])))
-    acc$Kr <- lapply(seq_len(ncomp), function(c) Reduce(`+`, lapply(ps, function(p) p$Kr[[c]])))
+    # Non-sparse: Kr is implied by Ar + Ddiag (see .he_solve_components), so don't sum it.
+    acc$Kr <- if (h$storeKr)
+      lapply(seq_len(ncomp), function(c) Reduce(`+`, lapply(ps, function(p) p$Kr[[c]]))) else NULL
+    acc
+  }
+
+  # Leave-one-out accumulator by SUBTRACTING one block from the full combine, instead of
+  # re-summing the other G-1 blocks for every block (turns the jackknife from O(G^2) to
+  # O(G) matrix ops). All combined fields are additive over blocks; Ddiag/trSigmaInv/
+  # resDotRes/metadata are block-invariant (n-level), so they carry over unchanged.
+  .combine_drop <- function(acc_full, p) {
+    acc <- acc_full
+    acc$compScoreSum <- acc_full$compScoreSum - p$compScoreSum
+    acc$compVar      <- acc_full$compVar      - p$compVar
+    acc$Mcomp        <- acc_full$Mcomp        - p$Mcomp
+    acc$M            <- acc_full$M            - p$M
+    acc$Ar <- lapply(seq_len(ncomp), function(c) acc_full$Ar[[c]] - p$Ar[[c]])
+    if (h$storeKr)
+      acc$Kr <- lapply(seq_len(ncomp), function(c) acc_full$Kr[[c]] - p$Kr[[c]])
     acc
   }
 
   # Solve every reported quantity from a combined accumulator.
   .solve_all <- function(acc) {
+    acc$Gram <- .gram_matrix(acc)                  # all Kr.Ar inner products, one BLAS call
     rg <- rep(NA_real_, P); gam <- rep(NA_real_, P)
     s2a <- rep(NA_real_, P); s2b <- rep(NA_real_, P)
     h2_joint <- rep(NA_real_, K); h2_own <- rep(NA_real_, K)
@@ -186,7 +233,8 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
     list(rg = rg, gamma = gam, s2a = s2a, s2b = s2b, h2_joint = h2_joint, h2_own = h2_own)
   }
 
-  full <- .solve_all(.combine(parts))
+  acc_full <- .combine(parts)
+  full <- .solve_all(acc_full)
   h2_primary <- if (perH2) full$h2_own else full$h2_joint
 
   .jk_se <- function(mat) apply(mat, 2, function(col) {
@@ -199,7 +247,7 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
     h2_jk <- matrix(NA_real_, length(parts), K)
     h2joint_jk <- matrix(NA_real_, length(parts), K)
     for (idx in seq_along(parts)) {
-      s <- .solve_all(.combine(parts[setdiff(seq_along(parts), idx)]))
+      s <- .solve_all(.combine_drop(acc_full, parts[[idx]]))
       if (P > 0) rg_jk[idx, ] <- s$rg
       h2_jk[idx, ] <- if (perH2) s$h2_own else s$h2_joint
       if (aMode) h2joint_jk[idx, ] <- s$h2_joint

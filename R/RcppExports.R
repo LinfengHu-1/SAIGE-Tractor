@@ -45,6 +45,10 @@ setMarker_GlobalVarsInCPP <- function(t_isOutputMoreDetails, t_marker_chunksize)
     invisible(.Call('_SAIGE_setMarker_GlobalVarsInCPP', PACKAGE = 'SAIGE', t_isOutputMoreDetails, t_marker_chunksize))
 }
 
+setRHE_GlobalVarsInCPP <- function(t_estimate_cross_anc_rg, t_rg_nProbes, t_rg_seed, t_rg_nJackknifeBlocks, t_rg_pairs, t_rg_perAncestryH2, t_rg_markerFile, t_h2_markerFile) {
+    invisible(.Call('_SAIGE_setRHE_GlobalVarsInCPP', PACKAGE = 'SAIGE', t_estimate_cross_anc_rg, t_rg_nProbes, t_rg_seed, t_rg_nJackknifeBlocks, t_rg_pairs, t_rg_perAncestryH2, t_rg_markerFile, t_h2_markerFile))
+}
+
 setRegion_GlobalVarsInCPP <- function(t_max_maf_region, t_max_markers_region, t_MACCutoff_to_CollapseUltraRare, t_min_gourpmac_for_burdenonly, t_r_corr) {
     invisible(.Call('_SAIGE_setRegion_GlobalVarsInCPP', PACKAGE = 'SAIGE', t_max_maf_region, t_max_markers_region, t_MACCutoff_to_CollapseUltraRare, t_min_gourpmac_for_burdenonly, t_r_corr))
 }
@@ -223,6 +227,10 @@ mainAdmixedInCPP <- function(RegionList, t_genoType, t_outputFile, t_traitType, 
 
 Unified_getOneMarker_Admixed <- function(t_genoType, t_gIndex_prev, t_gIndex, t_ref, t_alt, t_marker, t_pd, t_chr, t_altFreq, t_altCounts, t_missingRate, t_imputeInfo, t_isOutputIndexForMissing, t_indexForMissing, t_isOnlyOutputNonZero, t_indexForNonZero, t_GVec, t_isImputation, t_vcfField) {
     .Call('_SAIGE_Unified_getOneMarker_Admixed', PACKAGE = 'SAIGE', t_genoType, t_gIndex_prev, t_gIndex, t_ref, t_alt, t_marker, t_pd, t_chr, t_altFreq, t_altCounts, t_missingRate, t_imputeInfo, t_isOutputIndexForMissing, t_indexForMissing, t_isOnlyOutputNonZero, t_indexForNonZero, t_GVec, t_isImputation, t_vcfField)
+}
+
+readZaChunkInCPP <- function(t_genoType, t_genoIndex, t_NumberofANC, t_mafFloor) {
+    .Call('_SAIGE_readZaChunkInCPP', PACKAGE = 'SAIGE', t_genoType, t_genoIndex, t_NumberofANC, t_mafFloor)
 }
 
 mainMarkerAdmixedInCPP <- function(t_genoType, t_traitType, t_genoIndex_prev, t_genoIndex, t_isMoreOutput, t_isImputation, t_isFirth, t_NumberofANC, t_pvalcutoff_of_haplotype) {

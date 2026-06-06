@@ -534,6 +534,7 @@ Rcpp::List Get_PValue_Lambda(arma::vec &lambda, arma::vec &Q, arma::ivec &df1){
       // Call SKAT_davies with h = df1 for each Q[i] and lambda
       out = SKAT_davies(Qi, lambda, df1, delta, 0, 1000, std::pow(10, -6));
     }
+    int outifault = out["ifault"];
     p_val(i) = out["Qq"];
     
     is_converge(i) = 1;
@@ -541,7 +542,7 @@ Rcpp::List Get_PValue_Lambda(arma::vec &lambda, arma::vec &Q, arma::ivec &df1){
     // Check convergence
     if (lambda.n_elem == 1) {
       p_val[i] = p_val_liu[i];
-    } else if (out["ifault"] != 0) {
+    } else if (outifault != 0) {
       is_converge[i] = 0;
     }
     

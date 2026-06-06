@@ -7,6 +7,7 @@
 
 
 
+#include <random>
 #include "SAIGE_test.hpp"
 #include "SPA.hpp"
 #include "ER_binary_func.hpp"
@@ -636,6 +637,68 @@ void SAIGEClass::setupSparseMat(int r, arma::umat & locationMatinR, arma::vec & 
 arma::sp_mat SAIGEClass::gen_sp_SigmaMat() {
     arma::sp_mat resultMat(m_locationMat, m_valueVec, m_dimNum, m_dimNum);
     return resultMat;
+}
+
+// RHE: covariate-adjust G and apply Sigma^-1 (mirrors scoreTest, lines for gtilde
+// and t_P2Vec). Reuses the variance-ratio path (non-sparse) or sparse solve.
+void SAIGEClass::getGtildeAndP2(const arma::vec& G, arma::vec& gtilde, arma::vec& P2Vec){
+    arma::vec Gc = G;
+    getadjG(Gc, gtilde);                       // covariate-adjusted genotype
+    if(!m_flagSparseGRM_cur){
+        P2Vec = gtilde % m_mu2 * m_tauvec[0];  // Sigma^-1 gtilde (variance-ratio path)
+    }else{
+        arma::sp_mat Sig = gen_sp_SigmaMat();
+        P2Vec = arma::spsolve(Sig, gtilde);
+    }
+}
+
+// RHE memory optimization: is the current working covariance the non-sparse
+// (diagonal) variance-ratio path? If so, Sigma^-1 gtilde = D % gtilde with the
+// fixed length-N diagonal D below, so the K-side accumulator Kr need not be
+// stored -- it is reconstructed as D % Ar at solve time (halves RHE memory).
+bool SAIGEClass::isNonSparseDiag_for_rhe() const { return !m_flagSparseGRM_cur; }
+// the length-N diagonal D = mu2 * tau (only meaningful on the non-sparse path).
+arma::vec SAIGEClass::getRHEsigmaInvDiag() const { return m_mu2 * m_tauvec[0]; }
+
+// RHE-PCGC: covariate-residualized raw phenotype (linear/PCGC standardized).
+// resid = Y - X (X'X)^-1 X' Y, then scaled to unit variance. For binary this is
+// the PCGC-style phenotype whose ancestry scores correlate correctly (unlike the
+// GLMM observed residual Y-mu). The PCGC c^2 factor cancels in the rg ratio, so
+// no liability correction is needed for rg (it would be for absolute h2).
+arma::vec SAIGEClass::getPCGCphenoResidual(){
+    arma::vec Y = m_y;
+    arma::mat X = m_X;                              // includes intercept column
+    arma::vec beta = arma::solve(X.t() * X, X.t() * Y);
+    arma::vec r = Y - X * beta;
+    double sd = arma::stddev(r);
+    if(sd > 0) r /= sd;
+    return r;
+}
+
+// RHE: {trace(Sigma^-1), res·res, n} for the residual (sigma2_e) HE component.
+arma::vec SAIGEClass::getRHEnullConstants(int n_probe, unsigned int seed) {
+    arma::uword n = m_res.n_elem;
+    double resdotres = arma::dot(m_res, m_res);
+    double traceSigmaInv = 0.0;
+    if(!m_flagSparseGRM_cur){
+        // non-sparse working covariance: Sigma^-1 = diag(mu2) * tau
+        traceSigmaInv = arma::accu(m_mu2) * m_tauvec[0];
+    }else{
+        // sparse GRM: Hutchinson trace estimate  tr(Sigma^-1) ~ mean_b r_b' Sigma^-1 r_b
+        arma::sp_mat Sig = gen_sp_SigmaMat();
+        std::mt19937 gen(seed); std::uniform_int_distribution<int> coin(0,1);
+        double acc = 0.0; int B = (n_probe > 0) ? n_probe : 10;
+        for(int b = 0; b < B; b++){
+            arma::vec r(n);
+            for(arma::uword i = 0; i < n; i++) r(i) = coin(gen) ? 1.0 : -1.0;
+            arma::vec sol = arma::spsolve(Sig, r);
+            acc += arma::dot(r, sol);
+        }
+        traceSigmaInv = acc / B;
+    }
+    arma::vec out(3);
+    out(0) = traceSigmaInv; out(1) = resdotres; out(2) = (double) n;
+    return out;
 }
 
 // revised

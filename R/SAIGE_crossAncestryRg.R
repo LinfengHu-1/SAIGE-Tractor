@@ -318,6 +318,24 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
   }
   if (perH2) h2tab$h2_ownMarkers <- full$h2_own
   h2tab$h2 <- h2_primary; h2tab$h2_se <- h2_se; h2tab$h2_pval <- h2_pval
+
+  # Per-ancestry h2 IMPRECISION FLAG. Per-ancestry sigma2_a is identifiable but high-variance for
+  # LOW-EXPOSURE (minority) ancestries -- few ancestry-a segments per individual. Flag estimates
+  # the user should not over-interpret, using the jackknife SE (the honest precision measure):
+  #   "out_of_range" : h2 < 0 or > 1 (numerically implausible);
+  #   "imprecise"    : wide CI -- not significantly > 0 (1.96*SE >= h2) or CI crosses 1
+  #                    (h2 + 1.96*SE > 1) or SE is NA (only one jackknife block);
+  #   "ok"           : otherwise.
+  # rg (a ratio) is more robust to this than per-ancestry h2; consider --equalVar (a single shared
+  # variance) for a more stable estimate when a per-ancestry h2 is flagged.
+  .h2flag <- function(h, se) {
+    if (!is.finite(h)) return("out_of_range")
+    if (h < 0 || h > 1) return("out_of_range")
+    if (!is.finite(se)) return("imprecise")
+    if (1.96 * se >= h || h + 1.96 * se > 1) return("imprecise")
+    "ok"
+  }
+  h2tab$h2_flag <- vapply(seq_len(K), function(a) .h2flag(h2_primary[a], h2_se[a]), character(1))
   if (isBinary) {
     K_pop <- if (is.finite(prevalence)) prevalence else caseProp
     fac <- .rg_liability_factor(K_pop, caseProp)
@@ -337,8 +355,16 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
       "rg_pval_vs1: 1-sided H0 rg=1 vs H1 rg<1, radmix 'effects shared?' test) --\n", sep = "")
   print(out[, c("anc_a", "anc_b", "rg", "rg_se", "rg_pval", "rg_pval_vs1",
                 "cov_cross", "sigma2_anc_a", "sigma2_anc_b")], row.names = FALSE)
-  cat("-- per-ancestry heritability (h2_pval: one-sided H1 h2 > 0) --\n")
+  cat("-- per-ancestry heritability (h2_pval: one-sided H1 h2 > 0; h2_flag: precision) --\n")
   print(h2tab, row.names = FALSE)
+  flagged <- which(h2tab$h2_flag != "ok")
+  if (length(flagged) > 0) {
+    message("[rg] WARNING: per-ancestry h2 may be UNRELIABLE for ancestry(ies) ",
+            paste0(flagged, " (", h2tab$h2_flag[flagged], ")", collapse = ", "),
+            ". Per-ancestry h2 is high-variance for low-exposure (minority) ancestries; the rg ",
+            "estimates (a ratio) are more robust. For a more stable single shared-variance fit, ",
+            "re-run step3 with --equalVar=TRUE.")
+  }
   if (length(parts) <= 1)
     cat("NOTE: SEs/p-values are NA (need >1 jackknife block). Re-run step2 with",
         "--rg_nJackknifeBlocks>1 (e.g. 20) or split across chunks/chromosomes.\n")

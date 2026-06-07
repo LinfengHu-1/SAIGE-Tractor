@@ -186,7 +186,14 @@ struct RHEState {
   unsigned int seed = 1;
   int K = 0;                       // number of ancestries
   int G = 1;                       // # jackknife blocks written within this run
-  uint64_t markerCounter = 0;      // running kept-marker index -> block = counter % G
+  uint64_t markerCounter = 0;      // running kept-marker index -> block assignment
+  // jackknife block assignment. CONTIGUOUS (jkContiguous): markers stream in genomic order,
+  // so block = counter/jkBlockSize gives contiguous genomic blocks (LD stays WITHIN a block ->
+  // blocks ~independent -> correct jackknife SE under LD); G grows dynamically. Round-robin
+  // (jkContiguous=false, legacy): block = counter % G scatters LD-correlated neighbours across
+  // blocks -> between-block correlation -> SE underestimated under LD.
+  bool jkContiguous = false;
+  int  jkBlockSize = 0;            // markers per contiguous block (only used if jkContiguous)
   bool isBinary = false;           // trait type (for liability-scale h2 in R)
   double caseProp = 0.0;           // sample case proportion P (binary; for Lee 2011)
   arma::uword n = 0;               // number of samples
@@ -378,6 +385,21 @@ static void rhe_accumulate_anc(int a, const arma::vec& gt, const arma::vec& p2, 
   g_rhe.bufGt[a] = gt; g_rhe.bufP2[a] = p2; g_rhe.bufScore[a] = score; g_rhe.bufHas[a] = 1;
 }
 
+// grow the per-block accumulators to `newG` blocks (contiguous mode: append zeroed blocks as
+// markers cross into a new contiguous genomic block). No-op if newG <= current G.
+static void rhe_grow_blocks(int newG){
+  if(newG <= g_rhe.G) return;
+  const int ncomp = g_rhe.ncomp; const arma::uword n = g_rhe.n; const int B = g_rhe.B;
+  g_rhe.Ar.resize(newG, std::vector<arma::fmat>(ncomp, arma::zeros<arma::fmat>(n, B)));
+  if(g_rhe.storeKr)
+    g_rhe.Kr.resize(newG, std::vector<arma::fmat>(ncomp, arma::zeros<arma::fmat>(n, B)));
+  g_rhe.compScoreSum.resize(newG, arma::zeros<arma::vec>(ncomp));
+  g_rhe.compVar.resize(newG, arma::zeros<arma::vec>(ncomp));
+  g_rhe.Mcomp.resize(newG, arma::zeros<arma::vec>(ncomp));
+  g_rhe.Mblk.resize(newG, 0);
+  g_rhe.G = newG;
+}
+
 // end of marker: flush buffered ancestries into accumulators atomically.
 static void rhe_marker_end(){
   if(!g_rhe.on || !g_rhe.inited) return;
@@ -388,8 +410,15 @@ static void rhe_marker_end(){
   bool anyPass = false;
   for(int a = 0; a < g_rhe.K; a++) if(g_rhe.bufHas[a]) anyPass = true;
   if(!anyPass) return;
-  // assign this marker to a jackknife block (round-robin over G blocks).
-  int bk = (int)(g_rhe.markerCounter % (uint64_t)g_rhe.G);
+  // assign this marker to a jackknife block. CONTIGUOUS = genomic-order blocks of jkBlockSize
+  // markers (LD-aware; G grows). Round-robin = legacy interleaving (underestimates SE under LD).
+  int bk;
+  if(g_rhe.jkContiguous){
+    bk = (int)(g_rhe.markerCounter / (uint64_t)g_rhe.jkBlockSize);
+    if(bk >= g_rhe.G) rhe_grow_blocks(bk + 1);
+  }else{
+    bk = (int)(g_rhe.markerCounter % (uint64_t)g_rhe.G);
+  }
   g_rhe.markerCounter += 1;
   std::vector<arma::fmat>& ArB = g_rhe.Ar[bk];
   const bool sk = g_rhe.storeKr;
@@ -608,7 +637,18 @@ void setRHE_GlobalVarsInCPP(bool t_estimate_cross_anc_rg,
   g_rhe.on = t_estimate_cross_anc_rg;
   g_rhe.B = (t_rg_nProbes > 0) ? t_rg_nProbes : 30;
   g_rhe.seed = (unsigned int) t_rg_seed;
-  g_rhe.G = (t_rg_nJackknifeBlocks > 0) ? t_rg_nJackknifeBlocks : 1;
+  // jackknife blocks: POSITIVE => that many round-robin blocks (legacy). NEGATIVE => CONTIGUOUS
+  // (LD-aware) blocks of |value| markers each, with the block count growing dynamically. 0/absent
+  // => 1 block (no SE). Contiguous is the correct choice under LD (see rhe_marker_end).
+  if(t_rg_nJackknifeBlocks < 0){
+    g_rhe.jkContiguous = true;
+    g_rhe.jkBlockSize = -t_rg_nJackknifeBlocks;
+    g_rhe.G = 1;                                // grows as markers stream
+  }else{
+    g_rhe.jkContiguous = false;
+    g_rhe.jkBlockSize = 0;
+    g_rhe.G = (t_rg_nJackknifeBlocks > 0) ? t_rg_nJackknifeBlocks : 1;
+  }
   g_rhe.pairSpec = t_rg_pairs;                 // "" => joint all-K (A); else per-pair
   g_rhe.perAncestryH2 = t_rg_perAncestryH2;    // also estimate h2 on each anc's own markers
   g_rhe.rgMarkerFile = t_rg_markerFile;        // "" => no restriction (all tested markers)

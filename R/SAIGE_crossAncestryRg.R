@@ -150,7 +150,12 @@
 #'     (markers polymorphic in both) -- numerator and denominator share a set.
 #'   * --rg_perAncestryH2: each ancestry's h2 on its OWN markers M_a (h2_ownMarkers).
 #' @export
-estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = NA_real_) {
+estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = NA_real_,
+                                       equal_var = FALSE) {
+  # equal_var: if TRUE, constrain a SINGLE shared genetic variance sigma_g^2 across all
+  # ancestries in the JOINT (aMode) fit (radmix's compound-symmetry assumption: sigma_a^2 =
+  # sigma_g^2 for all a; rg_ab = gamma_ab/sigma_g^2). Default FALSE = free per-ancestry sigma_a^2
+  # (our native model). Only affects the joint-all-K solve; per-pair / per-anc-h2 are unchanged.
   stopifnot(length(partialFiles) >= 1)
   parts <- lapply(partialFiles, .read_rg_partial2)
   h <- parts[[1]]
@@ -197,7 +202,33 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
     rg <- rep(NA_real_, P); gam <- rep(NA_real_, P)
     s2a <- rep(NA_real_, P); s2b <- rep(NA_real_, P)
     h2_joint <- rep(NA_real_, K); h2_own <- rep(NA_real_, K)
-    if (aMode) {
+    if (aMode && equal_var) {
+      # EQUAL-VARIANCE (compound symmetry, radmix-style): a SINGLE shared sigma_g^2 across all
+      # K ancestries. Merge the K diagonal components (kind 0) into ONE pseudo-component whose
+      # design is the sum of the diagonal Ar/Kr and whose scalars are the summed compScoreSum/
+      # compVar; keep the per-pair cross components. Then sigma_a^2 = sigma_g^2 for all a and
+      # rg_ab = gamma_ab / sigma_g^2. (In aMode all components share one M_allK, so Mcomp is
+      # common across the diagonals -> summing designs is exact.) Reuses .gram_matrix +
+      # .he_solve_components on the reduced set for numerical consistency.
+      gd <- which(acc$kind == 0L); gc <- which(acc$kind == 1L)
+      acc2 <- list(gA = c(0L, acc$gA[gc]), gB = c(0L, acc$gB[gc]),   # merged is diagonal (fk=1)
+                   storeKr = acc$storeKr, Ddiag = acc$Ddiag,
+                   trSigmaInv = acc$trSigmaInv, resDotRes = acc$resDotRes,
+                   compScoreSum = c(sum(acc$compScoreSum[gd]), acc$compScoreSum[gc]),
+                   compVar      = c(sum(acc$compVar[gd]),      acc$compVar[gc]),
+                   Mcomp        = c(acc$Mcomp[gd[1]],          acc$Mcomp[gc]))
+      ar_merged <- Reduce(`+`, acc$Ar[gd])
+      acc2$Ar <- c(list(ar_merged), acc$Ar[gc])
+      acc2$Kr <- if (!is.null(acc$Kr)) c(list(Reduce(`+`, acc$Kr[gd])), acc$Kr[gc]) else NULL
+      acc2$Gram <- .gram_matrix(acc2)
+      sol <- .he_solve_components(acc2, seq_len(1L + length(gc)), B)
+      sg2 <- sol$genetic[1]; gm <- sol$genetic[1L + seq_along(gc)]
+      tot <- K * sg2 + sum(gm) + sol$sigma2_e            # sum_a sigma_a^2 = K*sigma_g^2
+      if (tot > 0) for (a in seq_len(K)) h2_joint[a] <- sg2 / tot
+      for (i in seq_along(gc)) { cc <- gc[i]; pid <- acc$pairId[cc] + 1L
+        gam[pid] <- gm[i]; s2a[pid] <- sg2; s2b[pid] <- sg2
+        if (sg2 > 0) rg[pid] <- gm[i] / sg2 }
+    } else if (aMode) {
       gd <- which(acc$kind == 0L); gc <- which(acc$kind == 1L)
       sol <- .he_solve_components(acc, c(gd, gc), B)
       s2 <- sol$genetic[seq_along(gd)]; gm <- sol$genetic[length(gd) + seq_along(gc)]

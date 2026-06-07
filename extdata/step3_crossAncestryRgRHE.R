@@ -24,7 +24,9 @@ option_list <- list(
   make_option("--outFile", type = "character", default = "",
     help = "Path to write the results table (tab-delimited). Per-ancestry h2 goes to <outFile>.h2."),
   make_option("--prevalence", type = "double", default = NA_real_,
-    help = "Population prevalence K for a BINARY trait. Enables liability-scale per-ancestry h2 (Lee et al. 2011). rg is scale-free and needs no prevalence. If omitted for a binary trait, the sample case proportion is used (assumes no ascertainment).")
+    help = "Population prevalence K for a BINARY trait. Enables liability-scale per-ancestry h2 (Lee et al. 2011). rg is scale-free and needs no prevalence. If omitted for a binary trait, the sample case proportion is used (assumes no ascertainment)."),
+  make_option("--equalVar", type = "logical", default = FALSE,
+    help = "Constrain a SINGLE shared genetic variance across all ancestries in the joint fit (radmix compound-symmetry: sigma_a^2 = sigma_g^2, rg_ab = gamma_ab/sigma_g^2), instead of the default free per-ancestry sigma_a^2. [default=FALSE]")
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
@@ -46,4 +48,4 @@ cat(sprintf("Combining %d RHE partial file(s):\n  %s\n",
             length(files), paste(files, collapse = "\n  ")))
 
 estimateCrossAncestryRgRHE(partialFiles = files, outFile = opt$outFile,
-                           prevalence = opt$prevalence)
+                           prevalence = opt$prevalence, equal_var = opt$equalVar)

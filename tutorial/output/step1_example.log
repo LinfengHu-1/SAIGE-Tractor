@@ -1,1 +1,855 @@
+Warning messages:
+1: replacing previous import ‘data.table::first’ by ‘dplyr::first’ when loading ‘SAIGE’ 
+2: replacing previous import ‘data.table::between’ by ‘dplyr::between’ when loading ‘SAIGE’ 
+3: replacing previous import ‘data.table::last’ by ‘dplyr::last’ when loading ‘SAIGE’ 
+Loading required package: optparse
+Warning message:
+package ‘optparse’ was built under R version 4.5.3 
+Warning: Your system is mis-configured: ‘/var/db/timezone/localtime’ is not a symlink
+Warning: ‘/var/db/timezone/localtime’ is not identical to any known timezone file
+R version 4.5.2 (2025-10-31)
+Platform: x86_64-conda-linux-gnu
+Running under: Ubuntu 20.04.6 LTS
 
+Matrix products: default
+BLAS/LAPACK: /app/.pixi/envs/default/lib/libopenblasp-r0.3.33.so;  LAPACK version 3.12.0
+
+locale:
+ [1] LC_CTYPE=C.UTF-8       LC_NUMERIC=C           LC_TIME=C.UTF-8       
+ [4] LC_COLLATE=C.UTF-8     LC_MONETARY=C.UTF-8    LC_MESSAGES=C.UTF-8   
+ [7] LC_PAPER=C.UTF-8       LC_NAME=C              LC_ADDRESS=C          
+[10] LC_TELEPHONE=C         LC_MEASUREMENT=C.UTF-8 LC_IDENTIFICATION=C   
+
+time zone: NA
+tzcode source: system (glibc)
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] optparse_1.8.2 SAIGE_1.4.9   
+
+loaded via a namespace (and not attached):
+ [1] R6_2.6.1              tidyselect_1.2.1      Matrix_1.7-5         
+ [4] lattice_0.22-9        magrittr_2.0.5        splines_4.5.2        
+ [7] glue_1.8.1            tibble_3.3.1          pkgconfig_2.0.3      
+[10] RcppParallel_5.1.11-2 dplyr_1.2.1           generics_0.1.4       
+[13] lifecycle_1.0.5       cli_3.6.6             grid_4.5.2           
+[16] vctrs_0.7.3           data.table_1.17.8     compiler_4.5.2       
+[19] tools_4.5.2           pillar_1.11.1         survival_3.8-6       
+[22] Rcpp_1.1.1-1.1        rlang_1.2.0          
+$plinkFile
+[1] "example_inputs/example_grm"
+
+$bedFile
+[1] ""
+
+$bimFile
+[1] ""
+
+$famFile
+[1] ""
+
+$phenoFile
+[1] "example_inputs/phenotype.tsv"
+
+$phenoCol
+[1] "Y"
+
+$traitType
+[1] "quantitative"
+
+$eventTimeCol
+[1] ""
+
+$pcgforUhatforSurvAnalysis
+[1] FALSE
+
+$invNormalize
+[1] FALSE
+
+$covarColList
+[1] "age,sex,PC1,PC2,PC3"
+
+$qCovarColList
+[1] "sex"
+
+$sampleIDColinphenoFile
+[1] "IID"
+
+$tol
+[1] 0.02
+
+$maxiter
+[1] 20
+
+$tolPCG
+[1] 1e-05
+
+$maxiterPCG
+[1] 500
+
+$nThreads
+[1] 1
+
+$SPAcutoff
+[1] 2
+
+$numRandomMarkerforVarianceRatio
+[1] 30
+
+$skipModelFitting
+[1] FALSE
+
+$skipVarianceRatioEstimation
+[1] FALSE
+
+$memoryChunk
+[1] 2
+
+$tauInit
+[1] "0,0"
+
+$LOCO
+[1] FALSE
+
+$isLowMemLOCO
+[1] FALSE
+
+$traceCVcutoff
+[1] 0.0025
+
+$nrun
+[1] 30
+
+$ratioCVcutoff
+[1] 0.001
+
+$outputPrefix
+[1] "output/step1_example"
+
+$outputPrefix_varRatio
+[1] ""
+
+$IsOverwriteVarianceRatioFile
+[1] TRUE
+
+$sparseGRMFile
+[1] ""
+
+$sparseGRMSampleIDFile
+[1] ""
+
+$isCateVarianceRatio
+[1] FALSE
+
+$relatednessCutoff
+[1] 0
+
+$cateVarRatioMinMACVecExclude
+[1] "10,20.5"
+
+$cateVarRatioMaxMACVecInclude
+[1] "20.5"
+
+$isCovariateTransform
+[1] TRUE
+
+$isDiagofKinSetAsOne
+[1] FALSE
+
+$useSparseGRMtoFitNULL
+[1] FALSE
+
+$usePCGwithSparseGRM
+[1] FALSE
+
+$useSparseGRMforVarRatio
+[1] FALSE
+
+$minMAFforGRM
+[1] 0.01
+
+$maxMissingRateforGRM
+[1] 0.15
+
+$minCovariateCount
+[1] -1
+
+$includeNonautoMarkersforVarRatio
+[1] FALSE
+
+$FemaleOnly
+[1] FALSE
+
+$MaleOnly
+[1] FALSE
+
+$sexCol
+[1] ""
+
+$FemaleCode
+[1] "1"
+
+$MaleCode
+[1] "0"
+
+$isCovariateOffset
+[1] TRUE
+
+$SampleIDIncludeFile
+[1] ""
+
+$help
+[1] FALSE
+
+tauInit  is  0 0 
+cateVarRatioMinMACVecExclude  is  10 20.5 
+cateVarRatioMaxMACVecInclude  is  20.5 
+200  samples have genotypes
+sex are categorical covariates
+formula is  Y~age+sex+PC1+PC2+PC3 
+200  samples have non-missing phenotypes
+200  samples will be used for analysis
+    IID X.Intercept. age sex1     PC1     PC2    PC3       Y IndexPheno
+1 S0000            1  35    0 -0.1256 -0.6511 1.5985 -0.4489          1
+2 S0001            1  47    0 -0.6532 -0.2485 1.3443 -1.0543          2
+3 S0002            1  49    0 -0.0984 -0.6329 1.2612 -0.4532          3
+4 S0003            1  65    1 -0.6459 -0.4633 1.3901  1.9546          4
+5 S0004            1  68    0 -0.0967 -0.5710 1.2947  2.2518          5
+6 S0005            1  71    1 -0.6470 -0.5424 1.3403  0.2011          6
+  IndexGeno
+1         1
+2         2
+3         3
+4         4
+5         5
+6         6
+qr transformation has been performed on covariates
+colnames(data.new) is  Y minus1 age sex1 PC1 PC2 PC3 
+out.transform$Param.transform$qrr:  6 6 
+[1] "isCovariateOffset=TRUE, so fixed effects coefficients won't be estimated."
+geno.g_minMACVarRatio 20
+geno.g_maxMACVarRatio -1
+Markers in the Plink file with MAF <  0.01  will be removed before constructing GRM
+Markers in the Plink file with missing rate >  0.15  will be removed before constructing GRM
+Y  is a quantitative trait
+glm:
+
+Call:  glm(formula = formula.new, family = gaussian(link = "identity"), 
+    data = data.new, offset = covoffset)
+
+Coefficients:
+(Intercept)  
+     0.3041  
+
+Degrees of Freedom: 199 Total (i.e. Null);  199 Residual
+Null Deviance:	    298.3 
+Residual Deviance: 298.3 	AIC: 651.5
+   user  system elapsed 
+ 14.028   3.706  17.675 
+Start fitting the NULL GLMM
+   user  system elapsed 
+ 14.110   3.706  17.758 
+[1] "Start reading genotype plink file here"
+nbyte: 50
+nbyte: 50
+reserve: 3120
+
+M: 60, N: 200
+setgeno mark1
+setgeno mark2
+13 markers with MAF >= 0.01 and missing rate <= 0.15
+time: 4.437
+[1] "Genotype reading is done"
+[1] "Genotype reading is done"
+Fixed-effect coefficients:
+(Intercept) 
+  0.3040505 
+initial tau is  1 0 
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+Tau:
+[1] 1 0
+Fixed-effect coefficients:
+          [,1]
+[1,] 0.3040505
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 30 runs is 0.0157992(> 0.0025
+try 40runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 40 runs is 0.0108375(> 0.0025
+try 50runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 50 runs is 0.00849793(> 0.0025
+try 60runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 60 runs is 0.00686413(> 0.0025
+try 70runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 70 runs is 0.00573244(> 0.0025
+try 80runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 80 runs is 0.00487989(> 0.0025
+try 90runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 90 runs is 0.00426173(> 0.0025
+try 100runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 100 runs is 0.00378424(> 0.0025
+try 110runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 110 runs is 0.00352294(> 0.0025
+try 120runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 120 runs is 0.00337159(> 0.0025
+try 130runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 130 runs is 0.00311885(> 0.0025
+try 140runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 140 runs is 0.00282927(> 0.0025
+try 150runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 150 runs is 0.0026341(> 0.0025
+try 160runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+Variance component estimates:
+[1] 1.496179 0.000000
+
+Iteration  1 :
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+Tau:
+[1] 1.496179 0.000000
+Fixed-effect coefficients:
+          [,1]
+[1,] 0.3040506
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 30 runs is 0.0157992(> 0.0025
+try 40runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 40 runs is 0.0108375(> 0.0025
+try 50runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 50 runs is 0.00849793(> 0.0025
+try 60runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 60 runs is 0.00686413(> 0.0025
+try 70runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 70 runs is 0.00573244(> 0.0025
+try 80runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 80 runs is 0.00487989(> 0.0025
+try 90runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 90 runs is 0.00426173(> 0.0025
+try 100runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 100 runs is 0.00378424(> 0.0025
+try 110runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 110 runs is 0.00352293(> 0.0025
+try 120runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 120 runs is 0.00337159(> 0.0025
+try 130runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 130 runs is 0.00311885(> 0.0025
+try 140runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 140 runs is 0.00282927(> 0.0025
+try 150runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+CV for trace random estimator using 150 runs is 0.0026341(> 0.0025
+try 160runs
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+cov:  0.007480893 
+Variance component estimates:
+[1] 1.549525 0.000000
+Fixed-effect coefficients:
+          [,1]
+[1,] 0.3040506
+
+Final  1.549525 0 :
+t_end_null - t_begin, fitting the NULL model without LOCO took
+   user  system elapsed 
+  0.186   0.151   0.142 
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+Tau:
+[1] 1.549525 0.000000
+Fixed-effect coefficients:
+          [,1]
+[1,] 0.3040504
+   user  system elapsed 
+ 14.372   3.857  17.976 
+t_end - t_begin, fitting the NULL model took
+   user  system elapsed 
+  0.344   0.151   0.301 
+Start estimating variance ratios
+
+Family: gaussian 
+Link function: identity 
+
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+iter from getPCG1ofSigmaAndVector 1
+length(MACvector):  13 
+length(MACvector_forVarRatio):  44 
+Only one variance ratio will be estimated using randomly selected markers with MAC >= 20
+17 th marker in geno  1 
+MAC:  58 
+G0 0 0 0 0 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+41 th marker in geno  1 
+MAC:  29 
+G0 0 0 0 0 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+2 th marker in geno  1 
+MAC:  23 
+G0 0 0 0 0 0 0 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+21 th marker in geno  1 
+MAC:  35 
+G0 0 1 0 0 0 0 0 0 1 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+8 th marker in geno  1 
+MAC:  58 
+G0 0 0 0 0 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+12 th marker in geno  1 
+MAC:  69 
+G0 0 0 1 0 0 0 1 0 1 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+34 th marker in geno  1 
+MAC:  27 
+G0 0 0 0 0 0 2 0 1 1 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+1 th marker in geno  1 
+MAC:  33 
+G0 0 0 0 0 0 0 0 2 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+23 th marker in geno  1 
+MAC:  62 
+G0 1 0 0 0 1 1 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+4 th marker in geno  1 
+MAC:  41 
+G0 0 0 0 0 0 0 0 1 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+10 th marker in geno  1 
+MAC:  27 
+G0 0 0 0 0 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+32 th marker in geno  1 
+MAC:  29 
+G0 1 0 0 0 0 0 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+39 th marker in geno  1 
+MAC:  67 
+G0 1 0 0 0 0 0 1 1 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+16 th marker in geno  1 
+MAC:  60 
+G0 0 0 0 0 0 0 0 1 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+3 th marker in geno  1 
+MAC:  65 
+G0 0 0 0 1 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+11 th marker in geno  1 
+MAC:  28 
+G0 0 0 0 0 0 0 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+31 th marker in geno  1 
+MAC:  62 
+G0 0 0 0 0 0 0 1 1 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+29 th marker in geno  1 
+MAC:  49 
+G0 0 1 0 1 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+15 th marker in geno  1 
+MAC:  29 
+G0 1 0 0 0 0 0 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+40 th marker in geno  1 
+MAC:  94 
+G0 0 0 1 0 0 1 0 1 2 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+13 th marker in geno  1 
+MAC:  25 
+G0 0 0 0 0 0 0 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+30 th marker in geno  1 
+MAC:  56 
+G0 0 0 0 0 0 0 1 1 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+33 th marker in geno  1 
+MAC:  49 
+G0 0 1 1 1 0 1 0 0 1 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+27 th marker in geno  1 
+MAC:  75 
+G0 1 0 0 1 0 1 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+5 th marker in geno  1 
+MAC:  39 
+G0 0 0 1 0 0 0 1 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+36 th marker in geno  1 
+MAC:  27 
+G0 0 0 0 1 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+44 th marker in geno  1 
+MAC:  22 
+G0 0 0 0 0 0 0 0 0 1 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+42 th marker in geno  1 
+MAC:  114 
+G0 2 1 0 0 1 0 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+26 th marker in geno  1 
+MAC:  21 
+G0 0 0 0 1 0 0 0 0 0 1 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+28 th marker in geno  1 
+MAC:  64 
+G0 0 1 0 2 2 2 0 0 0 0 
+CHR  22 
+iter from getPCG1ofSigmaAndVector 1
+CV for variance ratio estimate using  30  markers is  1.064424e-09  <  0.001 
+varRatio_null 0.6453589 
+         V1   V2 V3
+1 0.6453589 null  1
+closed the plinkFile!

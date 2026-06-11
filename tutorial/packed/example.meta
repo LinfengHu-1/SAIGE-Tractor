@@ -1,1 +1,8 @@
-
+format_version	1
+n_samples	200
+n_haps	400
+n_words	7
+n_ancestries	3
+rare_threshold	6
+source_genotype	example_inputs/genotypes.phased.vcf.gz
+source_flare	example_inputs/localanc.flare.vcf.gz

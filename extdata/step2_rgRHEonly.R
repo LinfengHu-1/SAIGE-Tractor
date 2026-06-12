@@ -94,7 +94,17 @@ genoType <- objGeno$genoType; maxGIndex <- 5000000L
 ## ---- accumulators ----
 pairs <- if (K >= 2) t(combn(K, 2)) else matrix(integer(0), 0, 2)   # pairs over the SUBSET (1..K)
 npair <- nrow(pairs); dJ <- K + npair + 1
-G <- opt$rg_nJackknifeBlocks; B <- opt$rg_nProbes
+# rg_nJackknifeBlocks: >0 = per-marker round-robin (legacy; interleaved blocks UNDER-estimate the SE
+# because each block samples every LD region -> leave-one-out barely moves the estimate). <0 = |G|
+# CHUNK-level blocks (LD-aware): each read chunk (~chunkSize contiguous markers, >> LD range) is
+# assigned as a unit, round-robin over |G| blocks, so blocks are effectively LD-independent and the
+# jackknife SE is calibrated. Prefer the negative (chunk) scheme for inference; the legacy positive
+# scheme is kept only for backward compatibility.
+G <- abs(opt$rg_nJackknifeBlocks); B <- opt$rg_nProbes
+chunkBlocks <- opt$rg_nJackknifeBlocks < 0              # TRUE => contiguous chunk-level jackknife
+chunkCtr <- 0L                                          # counts NON-EMPTY chunks (for chunk-block id)
+cat(sprintf("[rgRHEonly] jackknife scheme = %s (|G|=%d blocks)\n",
+            if (chunkBlocks) "chunk-level LD-aware (recommended)" else "per-marker round-robin (legacy)", G))
 set.seed(opt$rg_seed); P <- matrix(sample(c(-1,1), N*B, replace=TRUE), N, B)
 ## joint rg/h2 (over subset ancestries, on rg markers all-subset-ok)
 uA <- lapply(1:G, function(g) lapply(seq_len(K), function(a) matrix(0,N,B)))
@@ -126,7 +136,12 @@ for (s0 in seq(0L, maxGIndex, by=opt$chunkSize)) {
     Za - X %*% (XtX_inv %*% crossprod(X, Za)) })
   oks <- ok[aidx, , drop=FALSE]                         # K x m (subset)
   ytZ <- lapply(seq_len(K), function(s) as.vector(crossprod(Zt[[s]], yt)))
-  blockOf <- ((gptr + seq_len(m) - 1L) %% G) + 1L; gptr <- gptr + m
+  if (chunkBlocks) {                                   # whole chunk -> one block (LD-aware), round-robin over |G|
+    blockOf <- rep((chunkCtr %% G) + 1L, m); chunkCtr <- chunkCtr + 1L
+  } else {                                             # legacy per-marker round-robin
+    blockOf <- ((gptr + seq_len(m) - 1L) %% G) + 1L
+  }
+  gptr <- gptr + m
   ## JOINT rg/h2: markers where ALL subset ancestries pass MAF AND in rg set
   jmask <- rgKeep & (if (K==1) as.logical(oks[1,]) else apply(oks==1,2,all))
   for (g in 1:G) {
@@ -150,6 +165,14 @@ for (s0 in seq(0L, maxGIndex, by=opt$chunkSize)) {
   cat(sprintf("\r[rgRHEonly] gIndex %d  joint_mk=%d", s0+opt$chunkSize-1L, mJoint), file=stderr())
 }
 cat("\n", file=stderr()); stopifnot(mJoint > 0)
+if (chunkBlocks) {
+  nNonEmpty <- sum(MblkJ > 0)
+  if (nNonEmpty < 2L) stop(sprintf(
+    "chunk-level jackknife produced %d non-empty block(s): need >=2. Increase --chunkSize coverage or use fewer |blocks|.", nNonEmpty))
+  if (nNonEmpty < G) cat(sprintf(
+    "[rgRHEonly] WARNING: only %d of |G|=%d jackknife blocks got markers (chunks < |blocks|); SE uses %d blocks. Lower |--rg_nJackknifeBlocks| or --chunkSize.\n",
+    nNonEmpty, G, nNonEmpty))
+}
 
 ## ---- solvers ----
 solve_joint <- function(blocks) {
@@ -177,9 +200,14 @@ solve_own <- function(blocks, s) {  # 2-comp (K_s, I) -> h2_own
 
 fullJ <- est_joint(solve_joint(1:G))
 jk_h2 <- matrix(NA,G,K); jk_rg <- matrix(NA,G,max(npair,1)); jk_own <- matrix(NA,G,K)
-for (g in 1:G) { th <- solve_joint(setdiff(1:G,g))
-  if (!is.null(th)) { e<-est_joint(th); jk_h2[g,]<-e$h2; if (npair>0) jk_rg[g,]<-e$rg }
-  if (doOwn) for (s in seq_len(K)) jk_own[g,s] <- solve_own(setdiff(1:G,g), s) }
+for (g in 1:G) {
+  # only EMPTY-able under the chunk scheme: leaving out an empty block is a no-op, so its pseudo-value
+  # would equal the full estimate -- not a valid leave-one-out replicate, and it biases the jackknife
+  # variance (and the (n-1)/n factor) by the wrong block count. Leave NA so jkse() (which filters
+  # non-finite and uses that count) excludes it. No-op for legacy round-robin (all blocks populated).
+  if (MblkJ[g] > 0) { th <- solve_joint(setdiff(1:G,g))
+    if (!is.null(th)) { e<-est_joint(th); jk_h2[g,]<-e$h2; if (npair>0) jk_rg[g,]<-e$rg } }
+  if (doOwn) for (s in seq_len(K)) if (MblkH[g,s] > 0) jk_own[g,s] <- solve_own(setdiff(1:G,g), s) }
 jkse <- function(mat) apply(mat,2,function(v){v<-v[is.finite(v)]
   if(length(v)>1) sqrt((length(v)-1)/length(v)*sum((v-mean(v))^2)) else NA})
 h2_se <- jkse(jk_h2); rg_se <- if (npair>0) jkse(jk_rg) else numeric(0)

@@ -1,0 +1,22 @@
+# Build context = this dir (SAIGE-Tractor). Exclude things the image rebuilds from scratch or that are
+# local/host-specific, so we don't ship them to the daemon or clobber image-built artifacts.
+# NOTE: .dockerignore supports ONLY full-line comments (no trailing inline comments) -- a pattern with
+# a trailing "# ..." is taken literally and matches nothing.
+#
+# .pixi: local pixi env (mac) -- pixi install rebuilds it for linux in the image; copying the mac one
+#        bakes host paths into R (R_HOME), breaking R CMD INSTALL.
+.pixi
+.pixi/**
+# install_SAIGETractor: local R install target; the image installs into its own pixi env.
+install_SAIGETractor
+install_SAIGETractor/**
+# plink-ng: downloaded fresh by the install-plink2 task.
+plink-ng
+plink-ng/**
+# plink2_includes.a: mac arm64 archive; rebuilt for linux in the image.
+plink2_includes.a
+.git
+.git/**
+*.tar.gz
+.nfs*
+**/*.o

@@ -39,7 +39,7 @@ op <- list(
               help="markers for h2 (default all)"),
   make_option("--rg_perAncestryH2", type="logical", default=FALSE,
               help="also report per-ancestry h2 on each ancestry's OWN markers (h2_ownMarkers)"),
-  make_option("--rg_nProbes", type="integer", default=60),
+  make_option("--rg_nProbes", type="integer", default=30),
   make_option("--rg_nJackknifeBlocks", type="integer", default=20),
   make_option("--maf", type="double", default=0.01),
   make_option("--chunkSize", type="integer", default=2000),
@@ -185,6 +185,18 @@ solve_joint <- function(blocks) {
   q <- c(colSums(qd[blocks,,drop=FALSE])/M, if (npair>0) 2*colSums(qx[blocks,,drop=FALSE])/M, yty)
   as.vector(solve(S,q))
 }
+## probe-subset solve: identical to solve_joint but uses ONLY probe columns `pcols` of every U (incl P),
+## for the probe-convergence diagnostic (recompute rg from fewer probes; no genotype re-read).
+solve_joint_probes <- function(blocks, pcols) {
+  M <- sum(MblkJ[blocks]); if (M<=0) return(NULL)
+  U <- c(lapply(seq_len(K), function(s) Reduce(`+`, lapply(blocks, function(g) uA[[g]][[s]]))/M),
+         if (npair>0) lapply(seq_len(npair), function(p) Reduce(`+`, lapply(blocks, function(g) uX[[g]][[p]]))/M),
+         list(P))
+  bs <- length(pcols); d <- length(U); S <- matrix(0,d,d)
+  for (k in 1:d) for (l in k:d) S[k,l] <- S[l,k] <- sum(U[[k]][,pcols]*U[[l]][,pcols])/bs
+  q <- c(colSums(qd[blocks,,drop=FALSE])/M, if (npair>0) 2*colSums(qx[blocks,,drop=FALSE])/M, yty)
+  as.vector(solve(S,q))
+}
 est_joint <- function(th) { s2<-th[1:K]; gam<-if(npair>0) th[(K+1):(K+npair)] else numeric(0)
   tot<-sum(s2)+sum(gam)+th[length(th)]; h2<-if(tot>0) s2/tot else rep(NA,K)
   rg<-if(npair>0) sapply(1:npair,function(p){a<-pairs[p,1];b<-pairs[p,2]
@@ -200,17 +212,43 @@ solve_own <- function(blocks, s) {  # 2-comp (K_s, I) -> h2_own
 
 fullJ <- est_joint(solve_joint(1:G))
 jk_h2 <- matrix(NA,G,K); jk_rg <- matrix(NA,G,max(npair,1)); jk_own <- matrix(NA,G,K)
+jk_s2 <- matrix(NA,G,K); jk_gam <- matrix(NA,G,max(npair,1))   # components for the delta-method rg SE
 for (g in 1:G) {
   # only EMPTY-able under the chunk scheme: leaving out an empty block is a no-op, so its pseudo-value
   # would equal the full estimate -- not a valid leave-one-out replicate, and it biases the jackknife
   # variance (and the (n-1)/n factor) by the wrong block count. Leave NA so jkse() (which filters
   # non-finite and uses that count) excludes it. No-op for legacy round-robin (all blocks populated).
   if (MblkJ[g] > 0) { th <- solve_joint(setdiff(1:G,g))
-    if (!is.null(th)) { e<-est_joint(th); jk_h2[g,]<-e$h2; if (npair>0) jk_rg[g,]<-e$rg } }
+    if (!is.null(th)) { e<-est_joint(th); jk_h2[g,]<-e$h2; jk_s2[g,]<-e$s2
+      if (npair>0) { jk_rg[g,]<-e$rg; jk_gam[g,]<-e$gam } } }
   if (doOwn) for (s in seq_len(K)) if (MblkH[g,s] > 0) jk_own[g,s] <- solve_own(setdiff(1:G,g), s) }
 jkse <- function(mat) apply(mat,2,function(v){v<-v[is.finite(v)]
   if(length(v)>1) sqrt((length(v)-1)/length(v)*sum((v-mean(v))^2)) else NA})
 h2_se <- jkse(jk_h2); rg_se <- if (npair>0) jkse(jk_rg) else numeric(0)
+## delta-method jackknife SE for rg: jackknife the smooth COMPONENTS (sigma2_a, sigma2_b, gamma) and
+## propagate to rg=gamma/sqrt(s_a s_b) analytically -- robust to the ratio blowing up at low h2 (the
+## heavy tail that inflates the DIRECT rg jackknife). rg_se stays the direct estimate; rg_se_delta added.
+rg_se_delta <- if (npair>0) sapply(1:npair, function(p){
+  a<-pairs[p,1]; b<-pairs[p,2]; Mc<-cbind(jk_s2[,a], jk_s2[,b], jk_gam[,p])
+  ok<-rowSums(!is.finite(Mc))==0; Mc<-Mc[ok,,drop=FALSE]; nb<-nrow(Mc)
+  sa<-fullJ$s2[a]; sb<-fullJ$s2[b]; gm<-fullJ$gam[p]
+  if (nb<2 || sa<=0 || sb<=0) return(NA)
+  cm<-colMeans(Mc); Cov<-(nb-1)/nb*crossprod(sweep(Mc,2,cm))
+  rgv<-gm/sqrt(sa*sb); grad<-c(-rgv/(2*sa), -rgv/(2*sb), 1/sqrt(sa*sb))
+  v<-as.numeric(t(grad)%*%Cov%*%grad); if (is.finite(v) && v>0) sqrt(v) else NA }) else numeric(0)
+## probe-convergence diagnostic (mirrors estimateCrossAncestryRgRHE): jackknife over PROBES (leave out
+## probe-blocks, recompute rg from the stored per-probe accumulators -- no genotype re-read) to estimate the
+## Monte-Carlo SE the finite probe count B adds to rg. rg_converged = that MC SE is <=20% of the rg_se
+## (probe noise negligible vs sampling); NA if there is no rg_se (single block) or B<2.
+rg_mcse <- rep(NA_real_, max(npair,1)); rg_converged <- rep(NA, max(npair,1))
+if (npair>0 && B>=2) {
+  nbp <- min(B,10L); grp <- ((seq_len(B)-1L) %% nbp)+1L
+  rg_pj <- matrix(NA_real_, nbp, npair)
+  for (gg in seq_len(nbp)) { pc <- which(grp!=gg)
+    th <- solve_joint_probes(1:G, pc); if (!is.null(th)) rg_pj[gg,] <- est_joint(th)$rg }
+  rg_mcse <- jkse(rg_pj)
+  rg_converged <- ifelse(is.finite(rg_mcse) & is.finite(rg_se) & rg_se>0, rg_mcse <= 0.2*rg_se, NA)
+}
 own <- if (doOwn) sapply(seq_len(K), function(s) solve_own(1:G,s)) else rep(NA,K)
 own_se <- if (doOwn) jkse(jk_own) else rep(NA,K)
 
@@ -224,8 +262,15 @@ if (trait=="binary") { Kp <- if (is.na(opt$prevalence)) caseProp else opt$preval
 if (npair>0) {
   rg_z <- fullJ$rg/rg_se; rg_p <- 2*pnorm(abs(rg_z),lower.tail=FALSE)
   rg_z1 <- (fullJ$rg-1)/rg_se; rg_p1 <- pnorm(rg_z1)
-  rgtab <- data.frame(anc_a=aidx[pairs[,1]], anc_b=aidx[pairs[,2]], rg=fullJ$rg, rg_se=rg_se,
-                      rg_z=rg_z, rg_pval=rg_p, rg_z_vs1=rg_z1, rg_pval_vs1=rg_p1,
+  # rg_constrained: the raw rg point estimate clipped to the valid [-1,1] range. Raw `rg` stays PRIMARY
+  # (rg_se / rg_pval / rg_pval_vs1 are all on the raw scale); rg_constrained is the value to REPORT. The
+  # HE ratio leaves [-1,1] in a large fraction of reps at high true rg; clipping -- to [-1,1], NOT [0,1],
+  # so the rg=0 null is never folded -- is a big boundary-RMSE win at a small known boundary bias, with
+  # coverage/type-I preserved. See CALIBRATION_N20k_writeup.md §2.5 / aggregate_n20k.py.
+  rgtab <- data.frame(anc_a=aidx[pairs[,1]], anc_b=aidx[pairs[,2]], rg=fullJ$rg,
+                      rg_constrained=pmin(pmax(fullJ$rg,-1),1), rg_se=rg_se,
+                      rg_se_delta=rg_se_delta, rg_z=rg_z, rg_pval=rg_p, rg_z_vs1=rg_z1, rg_pval_vs1=rg_p1,
+                      rg_mcse_probe=rg_mcse, rg_converged=rg_converged,
                       cov_cross=fullJ$gam, sigma2_anc_a=fullJ$s2[pairs[,1]],
                       sigma2_anc_b=fullJ$s2[pairs[,2]], n_indiv=N, n_markers=mJoint)
   fwrite(rgtab, opt$outFile, sep="\t")

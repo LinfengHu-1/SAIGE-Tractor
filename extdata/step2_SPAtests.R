@@ -77,7 +77,7 @@ option_list <- list(
   make_option("--estimate_cross_anc_rg", type="logical",default=FALSE,
     help="For admixed analysis (--is_admixed=TRUE): accumulate RHE partial statistics during the score-test pass for individual-level cross-ancestry genetic correlation. Writes <SAIGEOutputFile>.rg_partial.bin per run; combine across chunks/chromosomes with estimateCrossAncestryRgRHE(). By default, FALSE."),
   make_option("--rg_nProbes", type="integer",default=30,
-    help="RHE number of random probes [default=30]. Higher = lower Monte-Carlo variance in the trace estimate."),
+    help="RHE number of random probes [default=30]. Higher = lower Monte-Carlo variance in the trace estimate (B=30 vs 100 is only ~2.5%->~0.8% probe-induced SE inflation). Hold B CONSTANT across runs you compare; step3 reports a probe-convergence flag."),
   make_option("--rg_seed", type="integer",default=1,
     help="RHE probe random seed. MUST be identical across all chunks/chromosomes so their partial accumulators are additive [default=1]."),
   make_option("--rg_nJackknifeBlocks", type="integer",default=1,

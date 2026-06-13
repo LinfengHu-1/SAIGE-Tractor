@@ -6,6 +6,9 @@ heritability `h2`, using a randomized Haseman-Elston (RHE) estimator on Tractor
 ancestry-deconvolved dosages (the same estimand as `radmix`, generalized to K>=2
 ancestries and to binary traits, and scalable to biobank N).
 
+> **All of Us users:** see [`README_AoU_crossAncestry.md`](README_AoU_crossAncestry.md) for the
+> AoU-specific walkthrough (dsub/Cromwell with the Docker image, FLARE inputs, 2-way AFR-EUR & 3-way).
+
 > **Scope:** this workflow is for **unrelated samples**. Remove related individuals first
 > (Step 0). For related samples, relatedness is not yet handled in this estimator.
 
@@ -23,6 +26,45 @@ ancestries and to binary traits, and scalable to biobank N).
 > - **Only if your dataset is already entirely unrelated** may you run them together
 >   (Workflow A with `--estimate_cross_anc_rg=TRUE`), since the GWAS samples == the rg/h2
 >   samples.
+
+---
+
+## Two-way vs K>2 admixture
+
+The estimator handles **any K ≥ 2 local ancestries**, set by `--number_of_ancestry` (Workflow A) /
+`--numberOfAncestry` (Workflow B) to match the number of ancestry components in your FLARE/Tractor
+local-ancestry calls. K determines how many genetic correlations are reported — **one per ancestry
+pair, `K(K-1)/2` in total**, all from a single joint fit:
+
+| K | example admixed cohort | `--number_of_ancestry` | pairs reported | rows in `out.rg.txt` |
+|---|---|---|---|---|
+| 2 | African–European (e.g. AoU AFR-EUR) | 2 | (1,2) | 1 |
+| 3 | Latino / 3-way (AFR-EUR-AMR) | 3 | (1,2),(1,3),(2,3) | 3 |
+| K | — | K | all C(K,2) | K(K-1)/2 |
+
+**Ancestry indices** (`anc_a`/`anc_b`, 1-based) follow the order of the ancestry components in the
+FLARE/`tractor_hybrid` input (ancestry 1 = first `ANC`/`AN` field, etc.). The tool reports indices, not
+labels — keep a note of which continental ancestry each index maps to.
+
+### Two-way (K = 2) — simplest, best-powered
+- One pair, one `rg` (the direct analog of `radmix` for AFR-EUR).
+- Both ancestries usually carry substantial genome-wide exposure, so the single `rg` and both
+  per-ancestry `h2` are well powered. Use `--number_of_ancestry=2`.
+
+### K > 2 — more pairs, watch the minority ancestry
+- All `K(K-1)/2` pairwise `rg` come from **one joint K-ancestry fit**, so they share variance
+  components and are mutually consistent.
+- **Minority-ancestry precision.** A per-ancestry `h2` (and any `rg` pair involving it) is identifiable
+  but **high-variance** when that ancestry has low average local-ancestry exposure (few ancestry-specific
+  segments per person — its *effective* N ≈ N × mean exposure). The output tells you when to be careful:
+  - `h2_flag = imprecise` / `out_of_range` → don't over-interpret that ancestry's `h2`. `rg` (a ratio)
+    is more robust to this than `h2`.
+  - prefer **`rg_se_delta`** over `rg_se` for any low-h2 / minority pair (it is the robust SE; see Output).
+  - if a thin ancestry destabilizes the joint fit, re-run the combine with **`--equalVar=TRUE`**
+    (radmix-style single shared genetic variance σ²_g across ancestries; `rg_ab = γ_ab/σ²_g`) — fewer
+    parameters, more stable, at the cost of the per-ancestry-variance assumption.
+- Larger N helps the minority components disproportionately. (At AoU scale this is usually fine for the
+  two major ancestries of a 3-way cohort; the third, smallest ancestry is the one to scrutinize.)
 
 ---
 
@@ -145,7 +187,7 @@ Rscript step2_rgRHEonly.R \
   --rg_markerFile=ld_pruned.snps \               # <-- MARKER LIST for rg (optional)
   --h2_markerFile=hapmap3.snps \                  # <-- MARKER LIST for h2 (optional)
   --rg_perAncestryH2=TRUE \
-  --rg_nProbes=60 --rg_nJackknifeBlocks=20 --rg_seed=1 \
+  --rg_nProbes=30 --rg_nJackknifeBlocks=20 --rg_seed=1 \
   --outFile=out.rg.txt
 # writes out.rg.txt + out.rg.txt.h2  (binary: --traitType=binary --prevalence=0.01)
 ```
@@ -159,9 +201,14 @@ Rscript step2_rgRHEonly.R \
 | column | meaning |
 |---|---|
 | `anc_a`, `anc_b` | ancestry indices (1-based) |
-| `rg`, `rg_se` | genetic correlation + block-jackknife SE |
+| `rg` | raw genetic-correlation point estimate (the HE ratio; can fall slightly outside [-1,1] in noisy cells). Kept primary for the SE/tests below |
+| `rg_constrained` | **the value to report** — `rg` clipped to the valid [-1,1] range. Use this for tables/plots |
+| `rg_se` | block-jackknife SE of `rg` (direct) |
+| `rg_se_delta` | block-jackknife SE via the **delta method** (jackknifes the variance components σ²ₐ/σ²_b/γ and propagates through `rg=γ/√(σ²ₐσ²_b)`). **Prefer this at low h2 / minority ancestry**, where the direct `rg_se` inflates from the ratio's heavy tail |
 | `rg_pval` | two-sided test **H0: rg = 0** (is there *any* cross-ancestry correlation?) |
 | `rg_pval_vs1` | one-sided test **H0: rg = 1** vs H1: rg < 1 (radmix "are causal effects *shared*?"; small p => effects **differ** across ancestries) |
+| `rg_mcse_probe` | Monte-Carlo SE that the finite probe count `B` (`--rg_nProbes`) contributes to `rg` — estimated by jackknifing over probes (no re-streaming). |
+| `rg_converged` | **probe-convergence flag.** `TRUE` if `rg_mcse_probe` ≤ 20% of the marker SE (so raising `B` would not materially tighten the SE); `FALSE` if probe noise is non-negligible (consider a larger `--rg_nProbes`, held constant across compared runs); `NA` if there's only one jackknife block to compare against. Analogue of SAIGE step1's adaptive trace check — but checked post-hoc, since the map-reduce design fixes `B` before the genotype pass. |
 | `cov_cross` | cross-ancestry genetic covariance (gamma) |
 | `sigma2_anc_a/b` | per-ancestry genetic variance components |
 
@@ -171,7 +218,11 @@ Rscript step2_rgRHEonly.R \
 |---|---|
 | `h2_joint`, `h2_joint_se`, `h2_joint_pval` | per-ancestry h2 from the joint K-ancestry fit; p is one-sided H1: h2 > 0 |
 | `h2_ownMarkers` | (if `--rg_perAncestryH2`) h2 on that ancestry's own marker set |
+| `h2_flag` | precision flag: `ok` / `imprecise` (wide CI — not significantly > 0, or CI crosses 1) / `out_of_range` (h2 < 0 or > 1). Treat non-`ok` ancestries cautiously — typical for low-exposure minority ancestries; prefer `rg` and/or `--equalVar`. (Emitted by the `step3_crossAncestryRgRHE.R` combine.) |
 | `h2_*_liability` | (binary, with `--prevalence`) liability-scale h2 (Lee et al. 2011) |
+
+> `rg_constrained` and `rg_se_delta` are emitted by **all** workflows (A and B); `h2_flag` is emitted by
+> the packaged combine `step3_crossAncestryRgRHE.R` (Workflow A).
 
 ---
 
@@ -185,9 +236,10 @@ Rscript step2_rgRHEonly.R \
 | `--h2_markerFile` | 2 / B | markers used for **h2**. h2 is tagging-limited; use a **fuller set** (e.g. HapMap3 ~1M). |
 | `--rg_ancestry_list` | B | restrict to a subset of ancestries, e.g. `2,3` (1-based). |
 | `--rg_perAncestryH2` | 2 / B | also report per-ancestry h2 on own markers (`h2_ownMarkers`). |
-| `--rg_nProbes` | 2 / B | RHE random probes (more = less Monte-Carlo noise; 30-60 typical). |
+| `--rg_nProbes` | 2 / B | RHE random probes (more = less Monte-Carlo noise). **Default 30** (matches the N=20k calibration runs; B=30 vs 100 is only ~2.5%→~0.8% probe-SE inflation). **Hold B constant across runs you compare;** step3 reports a `converged` flag. |
 | `--rg_nJackknifeBlocks` | 2 / B | block-jackknife blocks for the SE (>=2; ~20 for an SE from one run). |
 | `--rg_seed` | 2 | probe seed; **identical across chromosomes** so partials are additive. |
+| `--equalVar` | 3 | (`step3_crossAncestryRgRHE.R`) constrain a single shared genetic variance σ²_g across all ancestries (radmix compound symmetry; `rg_ab=γ_ab/σ²_g`). More stable for **K>2 with a thin minority ancestry**. |
 | `--prevalence` | 3 / B | population prevalence for liability-scale binary h2. |
 
 ---

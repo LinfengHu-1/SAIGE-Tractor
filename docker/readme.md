@@ -4,6 +4,13 @@ Builds a single image with **file conversion** (Kai's `tractor_hybrid` tools), *
 (step1/step2/step3 + createSparseGRM), and **cross-ancestry rg/h2** (no-GRM null + RHE) entry points.
 See `docker/Dockerfile` for the layer-by-layer rationale.
 
+**Multi-stage slim build.** A *builder* stage compiles the converter, the pixi conda env, plink2, and
+`R CMD INSTALL`s the package; the final *runtime* stage ships only the pixi env (R + the installed SAIGE
+package), the CLI scripts, and the converter binaries — **no build toolchain (g++/make/ccache), no
+package source tree (`src/`, `extdata/`, `R/`, `plink-ng`), and the env's static `.a` libs + man/doc
+pruned**. Result: **~2.1 GB on disk (~685 MB compressed for push/pull)**, down from ~3.9 GB single-stage.
+The builder stays cached, so incremental code-edit rebuilds are still minutes.
+
 ## Build
 
 Run from the package dir (`SAIGE-Tractor/`); context is `.`, `.dockerignore` excludes `.pixi`, `.git`,
@@ -13,6 +20,7 @@ the mac `plink2_includes.a`, etc.
 cd SAIGE-Tractor
 DOCKER_BUILDKIT=1 docker buildx build \
   --platform linux/amd64 \
+  --provenance=false --sbom=false \
   -f docker/Dockerfile \
   -t saigetractor:rg-h2 \
   --load .
@@ -21,8 +29,14 @@ DOCKER_BUILDKIT=1 docker buildx build \
 - `--platform linux/amd64` — target x86_64 clusters (runs locally on Apple Silicon via Colima+Rosetta).
 - `docker buildx` (not plain `docker build`) — **required**: the Dockerfile uses `RUN --mount=type=cache`
   (ccache) and `# syntax=docker/dockerfile:1`, which need BuildKit/buildx.
+- `--provenance=false --sbom=false` — produce a **plain single-platform image** (no attestation manifest
+  list). Important for the `docker save → apptainer build` cluster path below, which expects a
+  single-platform archive; also makes `docker images` report a sane size.
 - `--load` — load the finished image into the local docker image store (so `docker images` /
   `docker save` see it).
+
+> Note: with the containerd image store, `docker images` shows the **compressed** size (~685 MB); the
+> unpacked on-disk size is ~2.1 GB (`docker run --rm saigetractor:rg-h2 du -sh /`).
 
 The first build is slow (emulated amd64 + a full pixi conda env). Re-running is fast: layers are
 ordered so the expensive converter + pixi env + plink2 layers are cached, and a package-code edit only
@@ -56,8 +70,13 @@ gunzip st.tar.gz && apptainer build st.sif docker-archive://st.tar
 apptainer exec --bind "$PWD:/work" st.sif step2_rgRHEonly.R --help
 ```
 
-## Publish to Docker Hub (optional, legacy flow)
+## Publish to Docker Hub
 ```bash
+docker login                                          # once — an account with push rights to wzhou88
 docker tag  saigetractor:rg-h2 wzhou88/saigetractor:rg-h2
 docker push wzhou88/saigetractor:rg-h2
+```
+For a published/citeable analysis, pin the digest after pushing:
+```bash
+docker inspect --format '{{index .RepoDigests 0}}' wzhou88/saigetractor:rg-h2   # → wzhou88/saigetractor@sha256:…
 ```

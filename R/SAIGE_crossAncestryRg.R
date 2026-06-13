@@ -80,6 +80,25 @@
   }
 }
 
+#' Gram matrix over a SUBSET of probe columns -- for the probe-convergence diagnostic. Identical to
+#' .gram_matrix but restricted to probes `pcols` (subset of 1:B). Ar/Kr are stored as n x B matrices, so
+#' we subset their columns then flatten. Lets us recompute rg from fewer probes WITHOUT re-streaming.
+#' @keywords internal
+.gram_matrix_probes <- function(acc, pcols) {
+  ncomp <- length(acc$Ar)
+  n <- nrow(acc$Ar[[1]]); bsub <- length(pcols); nB <- n * bsub
+  Am <- matrix(0, nB, ncomp)
+  for (c in seq_len(ncomp)) Am[, c] <- acc$Ar[[c]][, pcols]
+  if (is.null(acc$Kr)) {
+    w <- rep(acc$Ddiag, length.out = nB)        # per-sample weight, recycled over the bsub probes
+    crossprod(Am * w, Am)
+  } else {
+    Km <- matrix(0, nB, ncomp)
+    for (c in seq_len(ncomp)) Km[, c] <- acc$Kr[[c]][, pcols]
+    crossprod(Km, Am)
+  }
+}
+
 .he_solve_components <- function(acc, gidx, B) {
   d <- length(gidx) + 1L
   S <- matrix(0, d, d); q <- numeric(d)
@@ -135,6 +154,15 @@
 #'   "h2". Standard errors and p-values are block-jackknife: they require >1 partial
 #'   file, obtained either from multiple step2 chunks/chromosomes OR from a single
 #'   step2 run with --rg_nJackknifeBlocks>1 (one partial file per block).
+#'   The rg SE is reported two ways: rg_se (direct jackknife of rg) and rg_se_delta
+#'   (delta-method -- jackknife the smooth components sigma2_a/sigma2_b/gamma and
+#'   propagate through rg=gamma/sqrt(s_a s_b)); rg_se_delta is robust to the ratio's
+#'   heavy tail at low h2 / minority ancestry, where the direct rg_se is inflated.
+#'   rg_mcse_probe / rg_converged are the probe-convergence diagnostic: rg_mcse_probe is
+#'   the Monte-Carlo SE that the finite probe count B contributes to rg (jackknife over
+#'   probes, no re-streaming), and rg_converged is TRUE when that is <=20% of the marker
+#'   SE (so raising B would not materially tighten rg's SE), FALSE if not, NA if there is
+#'   no marker jackknife to compare against (single block) or B<2.
 #'   rg_pval is a TWO-SIDED Wald test of rg != 0 (rg is interior; unreliable near
 #'   rg = +/-1, where a profile-likelihood LRT is preferred). rg_pval_vs1 is the
 #'   radmix-style ONE-SIDED test of perfect sharing H0: rg=1 vs H1: rg<1 (reject =>
@@ -196,9 +224,12 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
     acc
   }
 
-  # Solve every reported quantity from a combined accumulator.
-  .solve_all <- function(acc) {
-    acc$Gram <- .gram_matrix(acc)                  # all Kr.Ar inner products, one BLAS call
+  # Solve every reported quantity from a combined accumulator. pcols = NULL uses ALL B probes; passing a
+  # subset of probe indices recomputes everything from those probes only (the probe-convergence diagnostic).
+  .solve_all <- function(acc, pcols = NULL) {
+    Buse <- if (is.null(pcols)) B else length(pcols)
+    gram <- function(a) if (is.null(pcols)) .gram_matrix(a) else .gram_matrix_probes(a, pcols)
+    acc$Gram <- gram(acc)                          # all Kr.Ar inner products, one BLAS call
     rg <- rep(NA_real_, P); gam <- rep(NA_real_, P)
     s2a <- rep(NA_real_, P); s2b <- rep(NA_real_, P)
     h2_joint <- rep(NA_real_, K); h2_own <- rep(NA_real_, K)
@@ -220,8 +251,8 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
       ar_merged <- Reduce(`+`, acc$Ar[gd])
       acc2$Ar <- c(list(ar_merged), acc$Ar[gc])
       acc2$Kr <- if (!is.null(acc$Kr)) c(list(Reduce(`+`, acc$Kr[gd])), acc$Kr[gc]) else NULL
-      acc2$Gram <- .gram_matrix(acc2)
-      sol <- .he_solve_components(acc2, seq_len(1L + length(gc)), B)
+      acc2$Gram <- gram(acc2)
+      sol <- .he_solve_components(acc2, seq_len(1L + length(gc)), Buse)
       sg2 <- sol$genetic[1]; gm <- sol$genetic[1L + seq_along(gc)]
       tot <- K * sg2 + sum(gm) + sol$sigma2_e            # sum_a sigma_a^2 = K*sigma_g^2
       if (tot > 0) for (a in seq_len(K)) h2_joint[a] <- sg2 / tot
@@ -230,7 +261,7 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
         if (sg2 > 0) rg[pid] <- gm[i] / sg2 }
     } else if (aMode) {
       gd <- which(acc$kind == 0L); gc <- which(acc$kind == 1L)
-      sol <- .he_solve_components(acc, c(gd, gc), B)
+      sol <- .he_solve_components(acc, c(gd, gc), Buse)
       s2 <- sol$genetic[seq_along(gd)]; gm <- sol$genetic[length(gd) + seq_along(gc)]
       names(s2) <- acc$gA[gd]                          # sigma2 keyed by ancestry (0-idx)
       tot <- sum(sol$genetic) + sol$sigma2_e
@@ -249,7 +280,7 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
         ad <- cc[acc$kind[cc] == 3L & acc$gA[cc] == a]
         bd <- cc[acc$kind[cc] == 3L & acc$gA[cc] == b]
         xc <- cc[acc$kind[cc] == 4L]
-        sol <- .he_solve_components(acc, c(ad, bd, xc), B)
+        sol <- .he_solve_components(acc, c(ad, bd, xc), Buse)
         va <- sol$genetic[1]; vb <- sol$genetic[2]; gm <- sol$genetic[3]
         s2a[pid] <- va; s2b[pid] <- vb; gam[pid] <- gm
         if (va > 0 && vb > 0) rg[pid] <- gm / sqrt(va * vb)
@@ -257,7 +288,7 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
     }
     if (perH2) for (cc in which(acc$kind == 2L)) {      # single-GRM h2 on M_a
       a <- acc$gA[cc] + 1L
-      sol <- .he_solve_components(acc, cc, B)
+      sol <- .he_solve_components(acc, cc, Buse)
       s <- sol$genetic[1]; e <- sol$sigma2_e
       if ((s + e) > 0) h2_own[a] <- s / (s + e)
     }
@@ -272,20 +303,62 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
     v <- col[is.finite(col)]
     if (length(v) > 1) { g <- length(v); sqrt((g - 1) / g * sum((v - mean(v))^2)) } else NA_real_ })
   rg_se <- rep(NA_real_, max(P, 1L)); h2_se <- rep(NA_real_, K)
+  rg_se_delta <- rep(NA_real_, max(P, 1L))     # robust delta-method rg SE (filled below)
   h2joint_se <- rep(NA_real_, K)               # SE of the joint-fit per-ancestry h2
   if (length(parts) > 1) {
     rg_jk <- matrix(NA_real_, length(parts), max(P, 1L))
+    s2a_jk <- matrix(NA_real_, length(parts), max(P, 1L))   # smooth components for delta-method rg SE
+    s2b_jk <- matrix(NA_real_, length(parts), max(P, 1L))
+    gam_jk <- matrix(NA_real_, length(parts), max(P, 1L))
     h2_jk <- matrix(NA_real_, length(parts), K)
     h2joint_jk <- matrix(NA_real_, length(parts), K)
     for (idx in seq_along(parts)) {
       s <- .solve_all(.combine_drop(acc_full, parts[[idx]]))
-      if (P > 0) rg_jk[idx, ] <- s$rg
+      if (P > 0) { rg_jk[idx, ] <- s$rg
+        s2a_jk[idx, ] <- s$s2a; s2b_jk[idx, ] <- s$s2b; gam_jk[idx, ] <- s$gamma }
       h2_jk[idx, ] <- if (perH2) s$h2_own else s$h2_joint
       if (aMode) h2joint_jk[idx, ] <- s$h2_joint
     }
     if (P > 0) rg_se <- .jk_se(rg_jk)
     h2_se <- .jk_se(h2_jk)
     if (aMode) h2joint_se <- .jk_se(h2joint_jk)
+    # Delta-method jackknife SE for rg: jackknife the smooth COMPONENTS (sigma2_a, sigma2_b, gamma) --
+    # which never blow up -- and propagate to rg = gamma/sqrt(s_a s_b) analytically. Robust to the ratio
+    # exploding when a leave-one-out denominator is near zero (the heavy tail that inflates the DIRECT rg
+    # jackknife rg_se at low h2 / minority ancestry). rg_se stays primary (validated/calibrated at moderate
+    # h2); rg_se_delta is the robust alternative -- compare/choose downstream. Mirrors step2_rgRHEonly.R.
+    if (P > 0) for (p in seq_len(P)) {
+      Mc <- cbind(s2a_jk[, p], s2b_jk[, p], gam_jk[, p])
+      ok <- rowSums(!is.finite(Mc)) == 0; Mc <- Mc[ok, , drop = FALSE]; nb <- nrow(Mc)
+      sa <- full$s2a[p]; sb <- full$s2b[p]; gm <- full$gamma[p]
+      if (nb < 2 || !is.finite(sa) || !is.finite(sb) || sa <= 0 || sb <= 0) next
+      cm <- colMeans(Mc); Cov <- (nb - 1) / nb * crossprod(sweep(Mc, 2, cm))   # 3x3 jackknife cov
+      rgv <- gm / sqrt(sa * sb); grad <- c(-rgv / (2 * sa), -rgv / (2 * sb), 1 / sqrt(sa * sb))
+      v <- as.numeric(t(grad) %*% Cov %*% grad)
+      if (is.finite(v) && v > 0) rg_se_delta[p] <- sqrt(v)
+    }
+  }
+
+  # ---- probe-convergence diagnostic (analogue of SAIGE step1's adaptive trace check) ----
+  # The RHE traces are estimated from B random +/-1 probes; finite B adds Monte-Carlo noise to rg. We
+  # jackknife over PROBES (leave out probe-blocks, recompute rg from the STORED per-probe accumulators --
+  # no genotype re-streaming) to estimate that MC SE (rg_mcse_probe), then compare it to the MARKER
+  # jackknife SE (rg_se, the real sampling uncertainty). rg_converged = the probe MC SE is a small fraction
+  # (<= probe_tol) of the marker SE, i.e. raising B further would not materially change rg's SE. NA when
+  # there is no marker jackknife (single block) to compare against, or B < 2.
+  rg_mcse <- rep(NA_real_, max(P, 1L)); rg_converged <- rep(NA, max(P, 1L))
+  probe_tol <- 0.2                                       # converged if probe-SE <= 20% of marker SE (<2% SE inflation)
+  if (P > 0 && B >= 2) {
+    nbp <- min(B, 10L)                                   # probe-jackknife blocks (leave-one-block-out)
+    grp <- ((seq_len(B) - 1L) %% nbp) + 1L
+    rg_pj <- matrix(NA_real_, nbp, P)
+    for (g in seq_len(nbp)) {
+      pc <- which(grp != g)
+      if (length(pc) >= 1) rg_pj[g, ] <- .solve_all(acc_full, pcols = pc)$rg
+    }
+    rg_mcse <- .jk_se(rg_pj)
+    rg_converged <- ifelse(is.finite(rg_mcse) & is.finite(rg_se) & rg_se > 0,
+                           rg_mcse <= probe_tol * rg_se, NA)
   }
 
   nmark <- sum(vapply(parts, `[[`, numeric(1), "M"))
@@ -303,10 +376,15 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
   h2joint_z <- .z(full$h2_joint, h2joint_se)
   h2joint_pval <- stats::pnorm(h2joint_z, lower.tail = FALSE)
 
+  # rg_constrained: raw rg clipped to the valid [-1,1] range -- the value to REPORT (raw `rg` stays
+  # primary; rg_se / rg_pval / rg_pval_vs1 are on the raw scale). [-1,1] not [0,1] (never folds the rg=0
+  # null); a boundary-RMSE win at a small known boundary bias, coverage/type-I preserved. See §2.5.
   out <- data.frame(
     anc_a = h$pairA + 1L, anc_b = h$pairB + 1L,
-    rg = full$rg, rg_se = rg_se, rg_z = rg_z, rg_pval = rg_pval,
+    rg = full$rg, rg_constrained = pmin(pmax(full$rg, -1), 1),
+    rg_se = rg_se, rg_se_delta = rg_se_delta, rg_z = rg_z, rg_pval = rg_pval,
     rg_z_vs1 = rg_z_vs1, rg_pval_vs1 = rg_pval_vs1,
+    rg_mcse_probe = rg_mcse, rg_converged = rg_converged,
     cov_cross = full$gamma, sigma2_anc_a = full$s2a, sigma2_anc_b = full$s2b,
     n_indiv = n, n_markers = nmark, n_probes = B, stringsAsFactors = FALSE)
 
@@ -353,10 +431,19 @@ estimateCrossAncestryRgRHE <- function(partialFiles, outFile = "", prevalence = 
               mode, K, P, n, nmark, B, if (isBinary) " [binary]" else ""))
   cat("-- per-pair genetic correlation (rg_pval: 2-sided H1 rg!=0; ",
       "rg_pval_vs1: 1-sided H0 rg=1 vs H1 rg<1, radmix 'effects shared?' test) --\n", sep = "")
-  print(out[, c("anc_a", "anc_b", "rg", "rg_se", "rg_pval", "rg_pval_vs1",
-                "cov_cross", "sigma2_anc_a", "sigma2_anc_b")], row.names = FALSE)
+  print(out[, c("anc_a", "anc_b", "rg", "rg_constrained", "rg_se", "rg_se_delta", "rg_pval",
+                "rg_pval_vs1", "rg_mcse_probe", "rg_converged", "cov_cross",
+                "sigma2_anc_a", "sigma2_anc_b")], row.names = FALSE)
   cat("-- per-ancestry heritability (h2_pval: one-sided H1 h2 > 0; h2_flag: precision) --\n")
   print(h2tab, row.names = FALSE)
+  # probe-convergence: warn if the finite probe count B left non-negligible Monte-Carlo noise in any rg
+  notconv <- which(rg_converged %in% FALSE)
+  if (length(notconv) > 0)
+    message("[rg] NOTE: probe count B=", B, " not fully converged for pair(s) ",
+            paste0(out$anc_a[notconv], "-", out$anc_b[notconv], collapse = ", "),
+            " (probe MC-SE > ", probe_tol, "x the marker SE). rg point estimate is unaffected, but for a ",
+            "tighter SE re-run step2 with a larger --rg_nProbes (keep B IDENTICAL across all chunks/runs ",
+            "you compare). rg_converged=NA means no marker jackknife (single block) to compare against.")
   flagged <- which(h2tab$h2_flag != "ok")
   if (length(flagged) > 0) {
     message("[rg] WARNING: per-ancestry h2 may be UNRELIABLE for ancestry(ies) ",

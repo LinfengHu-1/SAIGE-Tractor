@@ -41,7 +41,7 @@ H2_MARKERS="${H2_MARKERS:-}"     # e.g. a HapMap3 ~1M list
 # -----------------------------------------------------------------------------
 # Key rg/h2 options:
 #   --estimate_cross_anc_rg=TRUE  turn on RHE accumulation (off by default)
-#   --rg_nProbes=30               # random probes (30-50 is plenty at scale)
+#   --rg_nProbes=30               # random probes (30 = standard, matches N=20k runs; hold B constant)
 #   --rg_seed=1                   # MUST be identical across all chunks/chroms
 #   --rg_nJackknifeBlocks=20      # split this run into 20 jackknife blocks so a
 #                                 #   single job yields an SE (else SE is NA)
